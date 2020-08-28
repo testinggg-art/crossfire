@@ -1,6 +1,7 @@
 package tls
 
 import (
+	"context"
 	stdtls "crypto/tls"
 	"io"
 	"net"
@@ -14,7 +15,7 @@ func init() {
 	proxy.RegisterClient("vmesss", NewTlsClient)
 }
 
-func NewTlsClient(url *url.URL) (proxy.Client, error) {
+func NewTlsClient(ctx context.Context, url *url.URL) (proxy.Client, error) {
 	addr := url.Host
 	sni, _, _ := net.SplitHostPort(addr)
 
@@ -25,7 +26,7 @@ func NewTlsClient(url *url.URL) (proxy.Client, error) {
 	}
 
 	url.Scheme = strings.TrimSuffix(url.Scheme, "s")
-	c.inner, _ = proxy.ClientFromURL(url.String())
+	c.inner, _ = proxy.ClientFromURL(ctx, url.String())
 
 	return c, nil
 }

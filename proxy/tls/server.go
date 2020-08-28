@@ -1,6 +1,7 @@
 package tls
 
 import (
+	"context"
 	stdtls "crypto/tls"
 	"errors"
 	"io"
@@ -15,7 +16,7 @@ func init() {
 	proxy.RegisterServer("vmesss", NewTlsServer)
 }
 
-func NewTlsServer(url *url.URL) (proxy.Server, error) {
+func NewTlsServer(ctx context.Context, url *url.URL) (proxy.Server, error) {
 	addr := url.Host
 	sni, _, _ := net.SplitHostPort(addr)
 
@@ -42,7 +43,7 @@ func NewTlsServer(url *url.URL) (proxy.Server, error) {
 	}
 
 	url.Scheme = strings.TrimSuffix(url.Scheme, "s")
-	s.inner, _ = proxy.ServerFromURL(url.String())
+	s.inner, _ = proxy.ServerFromURL(ctx, url.String())
 
 	return s, nil
 }
@@ -68,8 +69,4 @@ func (s *Server) Handshake(underlay net.Conn) (io.ReadWriter, *proxy.TargetAddr,
 	}
 	// TODO: Check if a http request, redirect to fallback address
 	return s.inner.Handshake(ss)
-}
-
-func (s *Server) Stop() {
-	s.inner.Stop()
 }

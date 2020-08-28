@@ -2,6 +2,7 @@ package vmess
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"log"
 	"net"
@@ -11,12 +12,14 @@ import (
 )
 
 func TestVMess(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	url := "vmess://a684455c-b14f-11ea-bf0d-42010aaa0003@127.0.0.1:9527?alterID=4"
-	server, err := proxy.ServerFromURL(url)
+	server, err := proxy.ServerFromURL(ctx, url)
 	if err != nil {
 		return
 	}
-	defer server.Stop()
 	client, err := proxy.ClientFromURL(url)
 	if err != nil {
 		return
@@ -76,4 +79,6 @@ func TestVMess(t *testing.T) {
 	if !bytes.Equal(world[:], []byte("world")) {
 		t.Fail()
 	}
+
+	// TODO: 测试重放攻击等
 }

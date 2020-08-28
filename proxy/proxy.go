@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log"
@@ -18,7 +19,7 @@ type Client interface {
 }
 
 // ClientCreator is a function to create client.
-type ClientCreator func(url *url.URL) (Client, error)
+type ClientCreator func(ctx context.Context, url *url.URL) (Client, error)
 
 var (
 	clientMap = make(map[string]ClientCreator)
@@ -31,7 +32,7 @@ func RegisterClient(name string, c ClientCreator) {
 
 // ClientFromURL calls the registered creator to create client.
 // dialer is the default upstream dialer so cannot be nil, we can use Default when calling this function.
-func ClientFromURL(s string) (Client, error) {
+func ClientFromURL(ctx context.Context, s string) (Client, error) {
 	u, err := url.Parse(s)
 	if err != nil {
 		log.Printf("can not parse client url %s err: %s", s, err)
@@ -40,7 +41,7 @@ func ClientFromURL(s string) (Client, error) {
 
 	c, ok := clientMap[strings.ToLower(u.Scheme)]
 	if ok {
-		return c(u)
+		return c(ctx, u)
 	}
 
 	return nil, errors.New("unknown client scheme '" + u.Scheme + "'")
@@ -51,11 +52,10 @@ type Server interface {
 	Name() string
 	Addr() string
 	Handshake(underlay net.Conn) (io.ReadWriter, *TargetAddr, error)
-	Stop()
 }
 
 // ServerCreator is a function to create proxy server
-type ServerCreator func(url *url.URL) (Server, error)
+type ServerCreator func(ctx context.Context, url *url.URL) (Server, error)
 
 var (
 	serverMap = make(map[string]ServerCreator)
@@ -68,7 +68,7 @@ func RegisterServer(name string, c ServerCreator) {
 
 // ServerFromURL calls the registered creator to create proxy servers
 // dialer is the default upstream dialer so cannot be nil, we can use Default when calling this function
-func ServerFromURL(s string) (Server, error) {
+func ServerFromURL(ctx context.Context, s string) (Server, error) {
 	u, err := url.Parse(s)
 	if err != nil {
 		log.Printf("can not parse server url %s err: %s", s, err)
@@ -77,7 +77,7 @@ func ServerFromURL(s string) (Server, error) {
 
 	c, ok := serverMap[strings.ToLower(u.Scheme)]
 	if ok {
-		return c(u)
+		return c(ctx, u)
 	}
 
 	return nil, errors.New("unknown server scheme '" + u.Scheme + "'")

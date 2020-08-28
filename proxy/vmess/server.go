@@ -1,6 +1,7 @@
 package vmess
 
 import (
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hmac"
@@ -32,7 +33,7 @@ func init() {
 	proxy.RegisterServer(Name, NewVmessServer)
 }
 
-func NewVmessServer(url *url.URL) (proxy.Server, error) {
+func NewVmessServer(ctx context.Context, url *url.URL) (proxy.Server, error) {
 	addr := url.Host
 	uuidStr := url.User.Username()
 	uuid, err := StrToUUID(uuidStr)
@@ -62,16 +63,13 @@ func NewVmessServer(url *url.URL) (proxy.Server, error) {
 	s.baseTime = time.Now().UTC().Unix() - cacheDurationSec*2
 	s.userHashes = make(map[[16]byte]*UserAtTime, 1024)
 	s.sessionHistory = make(map[SessionId]time.Time, 128)
-	s.ticker = time.NewTicker(updateInterval)
-	s.quit = make(chan struct{})
 	go func() {
 		for {
 			select {
-			case <-s.ticker.C:
-				s.Refresh()
-			case <-s.quit:
-				s.ticker.Stop()
+			case <-ctx.Done():
 				return
+			case <-time.After(updateInterval):
+				s.Refresh()
 			}
 		}
 	}()
@@ -104,8 +102,6 @@ type Server struct {
 
 	// 定时刷新userHashes和sessionHistory
 	mux4Hashes, mux4Sessions sync.RWMutex
-	ticker                   *time.Ticker
-	quit                     chan struct{}
 }
 
 func (s *Server) Name() string { return Name }
@@ -246,10 +242,6 @@ func (s *Server) Handshake(underlay net.Conn) (io.ReadWriter, *proxy.TargetAddr,
 	}
 
 	return c, addr, nil
-}
-
-func (s *Server) Stop() {
-	close(s.quit)
 }
 
 func (s *Server) Refresh() {

@@ -2,6 +2,7 @@ package tls
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"io/ioutil"
 	"log"
@@ -67,15 +68,17 @@ WS94/5WE/lwHJi8ZPSjH1AURCzXhUi4fGvBrNBtry95e+jcEvP5c0g==
 `
 
 func TestTls(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	ioutil.WriteFile("server.crt", []byte(cert), 0777)
 	ioutil.WriteFile("server.key", []byte(key), 0777)
 
 	url := "vmesss://a684455c-b14f-11ea-bf0d-42010aaa0003@localhost:9527?alterID=4&cert=server.crt&key=server.key"
-	server, err := proxy.ServerFromURL(url)
+	server, err := proxy.ServerFromURL(ctx, url)
 	if err != nil {
 		return
 	}
-	defer server.Stop()
 	client, err := proxy.ClientFromURL(url)
 	if err != nil {
 		return

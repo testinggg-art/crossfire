@@ -1,6 +1,7 @@
 package vmess
 
 import (
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hmac"
@@ -26,7 +27,7 @@ func init() {
 	proxy.RegisterClient(Name, NewVmessClient)
 }
 
-func NewVmessClient(url *url.URL) (proxy.Client, error) {
+func NewVmessClient(ctx context.Context, url *url.URL) (proxy.Client, error) {
 	addr := url.Host
 	uuidStr := url.User.Username()
 	uuid, err := StrToUUID(uuidStr)
@@ -80,6 +81,8 @@ type Client struct {
 	users    []*User
 	opt      byte
 	security byte
+
+	meter *proxy.Meter
 }
 
 func (c *Client) Name() string { return Name }

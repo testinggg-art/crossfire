@@ -1,6 +1,7 @@
 package socks5
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -16,7 +17,7 @@ func init() {
 	proxy.RegisterServer(Name, NewSocks5Server)
 }
 
-func NewSocks5Server(url *url.URL) (proxy.Server, error) {
+func NewSocks5Server(ctx context.Context, url *url.URL) (proxy.Server, error) {
 	addr := url.Host
 
 	// TODO: Support Auth
@@ -112,8 +113,4 @@ func (s *Server) Handshake(underlay net.Conn) (io.ReadWriter, *proxy.TargetAddr,
 	}
 
 	return underlay, addr, err
-}
-
-func (s *Server) Stop() {
-	// Nothing to stop or close
 }

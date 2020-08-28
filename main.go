@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -35,8 +36,9 @@ var (
 )
 
 const (
-	// 路由模式
+	// whitelist route mode
 	whitelist = "whitelist"
+	// blacklist route mode
 	blacklist = "blacklist"
 )
 
@@ -88,19 +90,22 @@ func main() {
 		os.Exit(-1)
 	}
 
+	// Context
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// 根据配置文件初始化组件
-	localServer, err := proxy.ServerFromURL(conf.Local)
+	localServer, err := proxy.ServerFromURL(ctx, conf.Local)
 	if err != nil {
 		log.Printf("can not create local server: %v", err)
 		os.Exit(-1)
 	}
-	defer localServer.Stop() // Server可能有一些定时任务，使用Stop关闭
-	remoteClient, err := proxy.ClientFromURL(conf.Remote)
+	remoteClient, err := proxy.ClientFromURL(ctx, conf.Remote)
 	if err != nil {
 		log.Printf("can not create remote client: %v", err)
 		os.Exit(-1)
 	}
-	directClient, _ := proxy.ClientFromURL("direct://")
+	directClient, _ := proxy.ClientFromURL(ctx, "direct://")
 	matcher := common.NewMather(conf.Route)
 
 	// 开启本地的TCP监听

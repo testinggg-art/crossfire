@@ -1,6 +1,7 @@
 package direct
 
 import (
+	"context"
 	"io"
 	"net"
 	"net/url"
@@ -14,7 +15,7 @@ func init() {
 	proxy.RegisterClient(name, NewDirectClient)
 }
 
-func NewDirectClient(url *url.URL) (proxy.Client, error) {
+func NewDirectClient(ctx context.Context, url *url.URL) (proxy.Client, error) {
 	return &Direct{}, nil
 }
 
