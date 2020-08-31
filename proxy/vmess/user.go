@@ -13,14 +13,19 @@ import (
 
 // Vmess user
 type User struct {
+	Hash   string
 	UUID   [16]byte
 	CmdKey [16]byte
 }
 
-func NewUser(uuid [16]byte) *User {
-	u := &User{UUID: uuid}
+func NewUser(hash string) (*User, error) {
+	uuid, err := StrToUUID(hash)
+	if err != nil {
+		return nil, err
+	}
+	u := &User{Hash: hash, UUID: uuid}
 	copy(u.CmdKey[:], GetKey(uuid))
-	return u
+	return u, nil
 }
 
 func nextID(oldID [16]byte) (newID [16]byte) {
@@ -43,7 +48,7 @@ func (u *User) GenAlterIDUsers(alterID int) []*User {
 	for i := 0; i < alterID; i++ {
 		newID := nextID(preID)
 		// NOTE: alterID user is a user which have a different uuid but a same cmdkey with the primary user.
-		users[i] = &User{UUID: newID, CmdKey: u.CmdKey}
+		users[i] = &User{Hash: u.Hash, UUID: newID, CmdKey: u.CmdKey}
 		preID = newID
 	}
 

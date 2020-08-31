@@ -61,7 +61,7 @@ func (s *Server) Name() string { return s.name }
 
 func (s *Server) Addr() string { return s.addr }
 
-func (s *Server) Handshake(underlay net.Conn) (io.ReadWriter, *proxy.TargetAddr, error) {
+func (s *Server) Handshake(underlay net.Conn) (io.ReadWriteCloser, *proxy.TargetAddr, error) {
 	ss := stdtls.Server(underlay, s.tlsConfig)
 	err := ss.Handshake()
 	if err != nil {
@@ -70,3 +70,4 @@ func (s *Server) Handshake(underlay net.Conn) (io.ReadWriter, *proxy.TargetAddr,
 	// TODO: Check if a http request, redirect to fallback address
 	return s.inner.Handshake(ss)
 }
+

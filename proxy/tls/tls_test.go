@@ -74,12 +74,12 @@ func TestTls(t *testing.T) {
 	ioutil.WriteFile("server.crt", []byte(cert), 0777)
 	ioutil.WriteFile("server.key", []byte(key), 0777)
 
-	url := "vmesss://a684455c-b14f-11ea-bf0d-42010aaa0003@localhost:9527?alterID=4&cert=server.crt&key=server.key"
+	url := "vmesss://a684455c-b14f-11ea-bf0d-42010aaa0003:4@localhost:9527?cert=server.crt&key=server.key"
 	server, err := proxy.ServerFromURL(ctx, url)
 	if err != nil {
 		return
 	}
-	client, err := proxy.ClientFromURL(url)
+	client, err := proxy.ClientFromURL(ctx, url)
 	if err != nil {
 		return
 	}

@@ -35,30 +35,39 @@ func init() {
 
 func NewVmessServer(ctx context.Context, url *url.URL) (proxy.Server, error) {
 	addr := url.Host
+
+	// uuid
 	uuidStr := url.User.Username()
-	uuid, err := StrToUUID(uuidStr)
+	user, err := NewUser(uuidStr)
 	if err != nil {
 		return nil, err
 	}
-	query := url.Query()
-	aid := query.Get("alterID")
-	if aid == "" {
-		aid = "4"
+
+	// alterId
+	alterIDStr, ok := url.User.Password()
+	if !ok {
+		alterIDStr = "4"
 	}
-	alterID, err := strconv.ParseUint(aid, 10, 32)
+	alterID, err := strconv.ParseUint(alterIDStr, 10, 32)
 	if err != nil {
 		log.Printf("parse alterId err: %v", err)
 		return nil, err
 	}
+
+	query := url.Query()
+
+	// security
 	security := query.Get("security")
 	if security == "" {
 		security = "none"
 	}
 
+	//
 	s := &Server{addr: addr}
-	user := NewUser(uuid)
 	s.users = append(s.users, user)
 	s.users = append(s.users, user.GenAlterIDUsers(int(alterID))...)
+
+	s.authenticator = proxy.NewAuthenticator(ctx, uuidStr)
 
 	s.baseTime = time.Now().UTC().Unix() - cacheDurationSec*2
 	s.userHashes = make(map[[16]byte]*UserAtTime, 1024)
@@ -102,13 +111,16 @@ type Server struct {
 
 	// 定时刷新userHashes和sessionHistory
 	mux4Hashes, mux4Sessions sync.RWMutex
+
+	// Provides user/stats control for client
+	authenticator *proxy.Authenticator
 }
 
 func (s *Server) Name() string { return Name }
 
 func (s *Server) Addr() string { return s.addr }
 
-func (s *Server) Handshake(underlay net.Conn) (io.ReadWriter, *proxy.TargetAddr, error) {
+func (s *Server) Handshake(underlay net.Conn) (io.ReadWriteCloser, *proxy.TargetAddr, error) {
 	// Set handshake timeout 4 seconds
 	if err := underlay.SetReadDeadline(time.Now().Add(time.Second * 4)); err != nil {
 		return nil, nil, err
@@ -138,10 +150,20 @@ func (s *Server) Handshake(underlay net.Conn) (io.ReadWriter, *proxy.TargetAddr,
 	user = uat.user
 	timestamp = uat.timeInc + s.baseTime
 	s.mux4Hashes.RUnlock()
+	c.user = user
+
+	valid, meter := s.authenticator.AuthUser(user.Hash)
+	if !valid {
+		return nil, nil, fmt.Errorf("invalid user hash %v", user.Hash)
+	}
+	c.meter = meter
+	c.meter.AddTraffic(0, 16)
+	c.recv += uint64(16)
 
 	//
 	// 解开指令部分，该部分使用了AES-128-CFB加密
 	//
+
 	fullReq := common.GetWriteBuffer()
 	defer common.PutWriteBuffer(fullReq)
 
@@ -153,10 +175,12 @@ func (s *Server) Handshake(underlay net.Conn) (io.ReadWriter, *proxy.TargetAddr,
 	// 41{1 + 16 + 16 + 1 + 1 + 1 + 1 + 1 + 2 + 1} + 1 + MAX{255} + MAX{15} + 4 = 362
 	req := common.GetBuffer(41)
 	defer common.PutBuffer(req)
-	_, err = io.ReadFull(c.Conn, req)
+	n, err := io.ReadFull(c.Conn, req)
 	if err != nil {
 		return nil, nil, err
 	}
+	c.meter.AddTraffic(0, n)
+	c.recv += uint64(n)
 	stream.XORKeyStream(req, req)
 	fullReq.Write(req)
 
@@ -197,10 +221,12 @@ func (s *Server) Handshake(underlay net.Conn) (io.ReadWriter, *proxy.TargetAddr,
 		// 解码域名的长度
 		reqLength := common.GetBuffer(1)
 		defer common.PutBuffer(reqLength)
-		_, err = io.ReadFull(c.Conn, reqLength)
+		n, err = io.ReadFull(c.Conn, reqLength)
 		if err != nil {
 			return nil, nil, err
 		}
+		c.meter.AddTraffic(0, n)
+		c.recv += uint64(n)
 		stream.XORKeyStream(reqLength, reqLength)
 		fullReq.Write(reqLength)
 		l = int(reqLength[0])
@@ -213,10 +239,12 @@ func (s *Server) Handshake(underlay net.Conn) (io.ReadWriter, *proxy.TargetAddr,
 	// 解码剩余部分
 	reqRemaining := common.GetBuffer(l + padingLen + 4)
 	defer common.PutBuffer(reqRemaining)
-	_, err = io.ReadFull(c.Conn, reqRemaining)
+	n, err = io.ReadFull(c.Conn, reqRemaining)
 	if err != nil {
 		return nil, nil, err
 	}
+	c.meter.AddTraffic(0, n)
+	c.recv += uint64(n)
 	stream.XORKeyStream(reqRemaining, reqRemaining)
 	fullReq.Write(reqRemaining)
 
@@ -225,7 +253,7 @@ func (s *Server) Handshake(underlay net.Conn) (io.ReadWriter, *proxy.TargetAddr,
 	} else {
 		addr.Name = string(reqRemaining[:l])
 	}
-
+	c.target = addr.String()
 	full := fullReq.Bytes()
 	// log.Printf("Request Recv %v", full)
 
@@ -291,6 +319,7 @@ type ServerConn struct {
 	dataReader io.Reader
 	dataWriter io.Writer
 
+	target   string
 	user     *User
 	opt      byte
 	security byte
@@ -300,92 +329,103 @@ type ServerConn struct {
 	reqRespV    byte
 	respBodyIV  [16]byte
 	respBodyKey [16]byte
+
+	meter *proxy.Meter
+	sent  uint64
+	recv  uint64
 }
 
-func (c *ServerConn) Read(b []byte) (n int, err error) {
-	if c.dataReader != nil {
-		return c.dataReader.Read(b)
-	}
+func (c *ServerConn) Read(b []byte) (int, error) {
+	if c.dataReader == nil {
+		// 解码数据部分
+		c.dataReader = c.Conn
+		if c.opt&OptChunkStream == OptChunkStream {
+			switch c.security {
+			case SecurityNone:
+				c.dataReader = ChunkedReader(c.Conn)
 
-	// 解码数据部分
-	c.dataReader = c.Conn
-	if c.opt&OptChunkStream == OptChunkStream {
-		switch c.security {
-		case SecurityNone:
-			c.dataReader = ChunkedReader(c.Conn)
+			case SecurityAES128GCM:
+				block, _ := aes.NewCipher(c.reqBodyKey[:])
+				aead, _ := cipher.NewGCM(block)
+				c.dataReader = AEADReader(c.Conn, aead, c.reqBodyIV[:])
 
-		case SecurityAES128GCM:
-			block, _ := aes.NewCipher(c.reqBodyKey[:])
-			aead, _ := cipher.NewGCM(block)
-			c.dataReader = AEADReader(c.Conn, aead, c.reqBodyIV[:])
-
-		case SecurityChacha20Poly1305:
-			key := common.GetBuffer(32)
-			t := md5.Sum(c.reqBodyKey[:])
-			copy(key, t[:])
-			t = md5.Sum(key[:16])
-			copy(key[16:], t[:])
-			aead, _ := chacha20poly1305.New(key)
-			c.dataReader = AEADReader(c.Conn, aead, c.reqBodyIV[:])
-			common.PutBuffer(key)
+			case SecurityChacha20Poly1305:
+				key := common.GetBuffer(32)
+				t := md5.Sum(c.reqBodyKey[:])
+				copy(key, t[:])
+				t = md5.Sum(key[:16])
+				copy(key[16:], t[:])
+				aead, _ := chacha20poly1305.New(key)
+				c.dataReader = AEADReader(c.Conn, aead, c.reqBodyIV[:])
+				common.PutBuffer(key)
+			}
 		}
 	}
 
-	return c.dataReader.Read(b)
+	n, err := c.dataReader.Read(b)
+	c.meter.AddTraffic(0, n)
+	c.recv += uint64(n)
+	return n, err
 }
 
-func (c *ServerConn) Write(b []byte) (n int, err error) {
-	if c.dataWriter != nil {
-		return c.dataWriter.Write(b)
-	}
+func (c *ServerConn) Write(b []byte) (int, error) {
+	if c.dataWriter == nil {
+		// 编码响应头
+		// 应答头部数据使用 AES-128-CFB 加密，IV 为 MD5(数据加密 IV)，Key 为 MD5(数据加密 Key)
+		buf := common.GetWriteBuffer()
+		defer common.PutWriteBuffer(buf)
 
-	// 编码响应头
-	// 应答头部数据使用 AES-128-CFB 加密，IV 为 MD5(数据加密 IV)，Key 为 MD5(数据加密 Key)
-	buf := common.GetWriteBuffer()
-	defer common.PutWriteBuffer(buf)
+		buf.WriteByte(c.reqRespV) // 响应认证 V
+		buf.WriteByte(c.opt)      // 选项 Opt
+		buf.Write([]byte{0, 0})   // 指令 Cmd 和 长度 M, 不支持动态端口指令
 
-	buf.WriteByte(c.reqRespV) // 响应认证 V
-	buf.WriteByte(c.opt)      // 选项 Opt
-	buf.Write([]byte{0, 0})   // 指令 Cmd 和 长度 M, 不支持动态端口指令
+		c.respBodyKey = md5.Sum(c.reqBodyKey[:])
+		c.respBodyIV = md5.Sum(c.reqBodyIV[:])
 
-	c.respBodyKey = md5.Sum(c.reqBodyKey[:])
-	c.respBodyIV = md5.Sum(c.reqBodyIV[:])
+		block, err := aes.NewCipher(c.respBodyKey[:])
+		if err != nil {
+			return 0, err
+		}
 
-	block, err := aes.NewCipher(c.respBodyKey[:])
-	if err != nil {
-		return 0, err
-	}
+		stream := cipher.NewCFBEncrypter(block, c.respBodyIV[:])
+		stream.XORKeyStream(buf.Bytes(), buf.Bytes())
+		_, err = c.Conn.Write(buf.Bytes())
+		if err != nil {
+			return 0, err
+		}
 
-	stream := cipher.NewCFBEncrypter(block, c.respBodyIV[:])
-	stream.XORKeyStream(buf.Bytes(), buf.Bytes())
-	_, err = c.Conn.Write(buf.Bytes())
-	if err != nil {
-		return 0, err
-	}
+		// 编码内容
+		c.dataWriter = c.Conn
+		if c.opt&OptChunkStream == OptChunkStream {
+			switch c.security {
+			case SecurityNone:
+				c.dataWriter = ChunkedWriter(c.Conn)
 
-	// 编码内容
-	c.dataWriter = c.Conn
-	if c.opt&OptChunkStream == OptChunkStream {
-		switch c.security {
-		case SecurityNone:
-			c.dataWriter = ChunkedWriter(c.Conn)
+			case SecurityAES128GCM:
+				block, _ := aes.NewCipher(c.reqBodyKey[:])
+				aead, _ := cipher.NewGCM(block)
+				c.dataWriter = AEADWriter(c.Conn, aead, c.reqBodyIV[:])
 
-		case SecurityAES128GCM:
-			block, _ := aes.NewCipher(c.reqBodyKey[:])
-			aead, _ := cipher.NewGCM(block)
-			c.dataWriter = AEADWriter(c.Conn, aead, c.reqBodyIV[:])
-
-		case SecurityChacha20Poly1305:
-			key := common.GetBuffer(32)
-			t := md5.Sum(c.reqBodyKey[:])
-			copy(key, t[:])
-			t = md5.Sum(key[:16])
-			copy(key[16:], t[:])
-			aead, _ := chacha20poly1305.New(key)
-			c.dataWriter = AEADWriter(c.Conn, aead, c.reqBodyIV[:])
-			common.PutBuffer(key)
+			case SecurityChacha20Poly1305:
+				key := common.GetBuffer(32)
+				t := md5.Sum(c.reqBodyKey[:])
+				copy(key, t[:])
+				t = md5.Sum(key[:16])
+				copy(key[16:], t[:])
+				aead, _ := chacha20poly1305.New(key)
+				c.dataWriter = AEADWriter(c.Conn, aead, c.reqBodyIV[:])
+				common.PutBuffer(key)
+			}
 		}
 	}
 
-	return c.dataWriter.Write(b)
+	n, err := c.dataWriter.Write(b)
+	c.meter.AddTraffic(n, 0)
+	c.sent += uint64(n)
+	return n, err
+}
+
+func (c *ServerConn) Close() error {
+	log.Printf("user %v from %v tunneling to %v closed, sent: %v, recv: %v", c.user.Hash, c.Conn.RemoteAddr(), c.target, common.HumanFriendlyTraffic(c.sent), common.HumanFriendlyTraffic(c.recv))
+	return c.Conn.Close()
 }

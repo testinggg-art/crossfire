@@ -130,16 +130,17 @@ func main() {
 				continue
 			}
 			go func() {
-				defer lc.Close()
 				var client proxy.Client
 
 				// 不同的服务端协议各自实现自己的响应逻辑, 其中返回的地址则用于匹配路由
 				// 常常需要额外编解码或者流量统计的功能，故需要给lc包一层以实现这些逻辑，即wlc
 				wlc, targetAddr, err := localServer.Handshake(lc)
 				if err != nil {
+					lc.Close()
 					log.Printf("failed in handshake from %v: %v", localServer.Addr(), err)
 					return
 				}
+				defer wlc.Close()
 
 				// 匹配路由
 				if conf.Route == whitelist { // 白名单模式，如果匹配，则直接访问，否则使用代理访问
@@ -169,14 +170,15 @@ func main() {
 					log.Printf("failed to dail to %v: %v", dialAddr, err)
 					return
 				}
-				defer rc.Close()
 
 				// 不同的客户端协议各自实现自己的请求逻辑
 				wrc, err := client.Handshake(rc, targetAddr.String())
 				if err != nil {
+					rc.Close()
 					log.Printf("failed in handshake to %v: %v", dialAddr, err)
 					return
 				}
+				defer wrc.Close()
 
 				// 流量转发
 				go io.Copy(wrc, wlc)

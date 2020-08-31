@@ -42,7 +42,7 @@ func (s *Server) Name() string { return Name }
 
 func (s *Server) Addr() string { return s.addr }
 
-func (s *Server) Handshake(underlay net.Conn) (io.ReadWriter, *proxy.TargetAddr, error) {
+func (s *Server) Handshake(underlay net.Conn) (io.ReadWriteCloser, *proxy.TargetAddr, error) {
 	// Set handshake timeout 4 seconds
 	if err := underlay.SetReadDeadline(time.Now().Add(time.Second * 4)); err != nil {
 		return nil, nil, err
@@ -64,7 +64,6 @@ func (s *Server) Handshake(underlay net.Conn) (io.ReadWriter, *proxy.TargetAddr,
 	}
 
 	// Write hello response
-	// TODO: Support Auth
 	_, err = underlay.Write([]byte{Version5, AuthNone})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to write hello response: %w", err)

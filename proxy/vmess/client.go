@@ -29,30 +29,39 @@ func init() {
 
 func NewVmessClient(ctx context.Context, url *url.URL) (proxy.Client, error) {
 	addr := url.Host
+
+	// uuid
 	uuidStr := url.User.Username()
-	uuid, err := StrToUUID(uuidStr)
+	user, err := NewUser(uuidStr)
 	if err != nil {
 		return nil, err
 	}
-	query := url.Query()
-	aid := query.Get("alterID")
-	if aid == "" {
-		aid = "4"
+
+	// alterId
+	alterIDStr, ok := url.User.Password()
+	if !ok {
+		alterIDStr = "4"
 	}
-	alterID, err := strconv.ParseUint(aid, 10, 32)
+	alterID, err := strconv.ParseUint(alterIDStr, 10, 32)
 	if err != nil {
 		log.Printf("parse alterId err: %v", err)
 		return nil, err
 	}
+
+	query := url.Query()
+
+	// security
 	security := query.Get("security")
 	if security == "" {
 		security = "none"
 	}
 
+	//
 	c := &Client{addr: addr}
-	user := NewUser(uuid)
 	c.users = append(c.users, user)
 	c.users = append(c.users, user.GenAlterIDUsers(int(alterID))...)
+
+	c.meter = proxy.NewMeter(ctx, uuidStr)
 
 	c.opt = OptChunkStream
 	security = strings.ToLower(security)
@@ -82,6 +91,7 @@ type Client struct {
 	opt      byte
 	security byte
 
+	// Provides stats control for client
 	meter *proxy.Meter
 }
 
@@ -89,10 +99,11 @@ func (c *Client) Name() string { return Name }
 
 func (c *Client) Addr() string { return c.addr }
 
-func (c *Client) Handshake(underlay net.Conn, target string) (io.ReadWriter, error) {
+func (c *Client) Handshake(underlay net.Conn, target string) (io.ReadWriteCloser, error) {
 	r := rand.Intn(len(c.users))
-	conn := &ClientConn{user: c.users[r], opt: c.opt, security: c.security}
+	conn := &ClientConn{target: target, user: c.users[r], opt: c.opt, security: c.security}
 	conn.Conn = underlay
+	conn.meter = c.meter
 	var err error
 	conn.atyp, conn.addr, conn.port, err = ParseAddr(target)
 	if err != nil {
@@ -124,6 +135,7 @@ func (c *Client) Handshake(underlay net.Conn, target string) (io.ReadWriter, err
 
 // ClientConn is a connection to vmess server
 type ClientConn struct {
+	target   string
 	user     *User
 	opt      byte
 	security byte
@@ -141,6 +153,10 @@ type ClientConn struct {
 	net.Conn
 	dataReader io.Reader
 	dataWriter io.Writer
+
+	meter *proxy.Meter
+	sent  uint64
+	recv  uint64
 }
 
 // Auth send auth info: HMAC("md5", UUID, UTC)
@@ -153,7 +169,9 @@ func (c *ClientConn) Auth() error {
 	h := hmac.New(md5.New, c.user.UUID[:])
 	h.Write(ts)
 
-	_, err := c.Conn.Write(h.Sum(nil))
+	n, err := c.Conn.Write(h.Sum(nil))
+	c.meter.AddTraffic(n, 0)
+	c.sent += uint64(n)
 	return err
 }
 
@@ -212,8 +230,9 @@ func (c *ClientConn) Request() error {
 	stream := cipher.NewCFBEncrypter(block, TimestampHash(time.Now().UTC().Unix()))
 	stream.XORKeyStream(buf.Bytes(), buf.Bytes())
 
-	_, err = c.Conn.Write(buf.Bytes())
-
+	n, err := c.Conn.Write(buf.Bytes())
+	c.meter.AddTraffic(n, 0)
+	c.sent += uint64(n)
 	return err
 }
 
@@ -229,7 +248,9 @@ func (c *ClientConn) DecodeRespHeader() error {
 	b := common.GetBuffer(4)
 	defer common.PutBuffer(b)
 
-	_, err = io.ReadFull(c.Conn, b)
+	n, err := io.ReadFull(c.Conn, b)
+	c.meter.AddTraffic(0, n)
+	c.recv += uint64(n)
 	if err != nil {
 		return err
 	}
@@ -248,69 +269,75 @@ func (c *ClientConn) DecodeRespHeader() error {
 	return nil
 }
 
-func (c *ClientConn) Write(b []byte) (n int, err error) {
-	if c.dataWriter != nil {
-		return c.dataWriter.Write(b)
-	}
+func (c *ClientConn) Write(b []byte) (int, error) {
+	if c.dataWriter == nil {
+		c.dataWriter = c.Conn
+		if c.opt&OptChunkStream == OptChunkStream {
+			switch c.security {
+			case SecurityNone:
+				c.dataWriter = ChunkedWriter(c.Conn)
 
-	c.dataWriter = c.Conn
-	if c.opt&OptChunkStream == OptChunkStream {
-		switch c.security {
-		case SecurityNone:
-			c.dataWriter = ChunkedWriter(c.Conn)
+			case SecurityAES128GCM:
+				block, _ := aes.NewCipher(c.reqBodyKey[:])
+				aead, _ := cipher.NewGCM(block)
+				c.dataWriter = AEADWriter(c.Conn, aead, c.reqBodyIV[:])
 
-		case SecurityAES128GCM:
-			block, _ := aes.NewCipher(c.reqBodyKey[:])
-			aead, _ := cipher.NewGCM(block)
-			c.dataWriter = AEADWriter(c.Conn, aead, c.reqBodyIV[:])
-
-		case SecurityChacha20Poly1305:
-			key := common.GetBuffer(32)
-			t := md5.Sum(c.reqBodyKey[:])
-			copy(key, t[:])
-			t = md5.Sum(key[:16])
-			copy(key[16:], t[:])
-			aead, _ := chacha20poly1305.New(key)
-			c.dataWriter = AEADWriter(c.Conn, aead, c.reqBodyIV[:])
-			common.PutBuffer(key)
+			case SecurityChacha20Poly1305:
+				key := common.GetBuffer(32)
+				t := md5.Sum(c.reqBodyKey[:])
+				copy(key, t[:])
+				t = md5.Sum(key[:16])
+				copy(key[16:], t[:])
+				aead, _ := chacha20poly1305.New(key)
+				c.dataWriter = AEADWriter(c.Conn, aead, c.reqBodyIV[:])
+				common.PutBuffer(key)
+			}
 		}
 	}
 
-	return c.dataWriter.Write(b)
+	n, err := c.dataWriter.Write(b)
+	c.meter.AddTraffic(n, 0)
+	c.sent += uint64(n)
+	return n, err
 }
 
-func (c *ClientConn) Read(b []byte) (n int, err error) {
-	if c.dataReader != nil {
-		return c.dataReader.Read(b)
-	}
+func (c *ClientConn) Read(b []byte) (int, error) {
+	if c.dataReader == nil {
+		err := c.DecodeRespHeader()
+		if err != nil {
+			return 0, err
+		}
+		c.dataReader = c.Conn
+		if c.opt&OptChunkStream == OptChunkStream {
+			switch c.security {
+			case SecurityNone:
+				c.dataReader = ChunkedReader(c.Conn)
 
-	err = c.DecodeRespHeader()
-	if err != nil {
-		return 0, err
-	}
+			case SecurityAES128GCM:
+				block, _ := aes.NewCipher(c.respBodyKey[:])
+				aead, _ := cipher.NewGCM(block)
+				c.dataReader = AEADReader(c.Conn, aead, c.respBodyIV[:])
 
-	c.dataReader = c.Conn
-	if c.opt&OptChunkStream == OptChunkStream {
-		switch c.security {
-		case SecurityNone:
-			c.dataReader = ChunkedReader(c.Conn)
-
-		case SecurityAES128GCM:
-			block, _ := aes.NewCipher(c.respBodyKey[:])
-			aead, _ := cipher.NewGCM(block)
-			c.dataReader = AEADReader(c.Conn, aead, c.respBodyIV[:])
-
-		case SecurityChacha20Poly1305:
-			key := common.GetBuffer(32)
-			t := md5.Sum(c.respBodyKey[:])
-			copy(key, t[:])
-			t = md5.Sum(key[:16])
-			copy(key[16:], t[:])
-			aead, _ := chacha20poly1305.New(key)
-			c.dataReader = AEADReader(c.Conn, aead, c.respBodyIV[:])
-			common.PutBuffer(key)
+			case SecurityChacha20Poly1305:
+				key := common.GetBuffer(32)
+				t := md5.Sum(c.respBodyKey[:])
+				copy(key, t[:])
+				t = md5.Sum(key[:16])
+				copy(key[16:], t[:])
+				aead, _ := chacha20poly1305.New(key)
+				c.dataReader = AEADReader(c.Conn, aead, c.respBodyIV[:])
+				common.PutBuffer(key)
+			}
 		}
 	}
 
-	return c.dataReader.Read(b)
+	n, err := c.dataReader.Read(b)
+	c.meter.AddTraffic(0, n)
+	c.recv += uint64(n)
+	return n, err
+}
+
+func (c *ClientConn) Close() error {
+	log.Printf("connection to %v closed, sent: %v, recv: %v", c.target, common.HumanFriendlyTraffic(c.sent), common.HumanFriendlyTraffic(c.recv))
+	return c.Conn.Close()
 }

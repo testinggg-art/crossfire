@@ -2,7 +2,6 @@ package proxy
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -11,7 +10,7 @@ import (
 )
 
 type Meter struct {
-	hash string // Identification of a user, can be UUID or any string
+	hash string // Identification of a user, can be UUID or string
 
 	sent        uint64
 	recv        uint64
@@ -167,76 +166,15 @@ func (u *Meter) GetSpeed() (uint64, uint64) {
 	return u.sendSpeed, u.recvSpeed
 }
 
-type Authenticator struct {
-	sync.RWMutex
-
-	users map[string]*Meter
-	ctx   context.Context
-}
-
-func (a *Authenticator) AuthUser(hash string) (bool, *Meter) {
-	a.RLock()
-	defer a.RUnlock()
-	if user, found := a.users[hash]; found {
-		return true, user
-	}
-	return false, nil
-}
-
-func (a *Authenticator) AddUser(hash string) error {
-	a.Lock()
-	defer a.Unlock()
-	if _, found := a.users[hash]; found {
-		return fmt.Errorf("hash %v already exists", hash)
-	}
-	ctx, cancel := context.WithCancel(a.ctx)
+// Create Meter from user id
+func NewMeter(ctx context.Context, userId string) *Meter {
+	ctx, cancel := context.WithCancel(ctx)
 	meter := &Meter{
-		hash:    hash,
+		hash:    userId,
 		ctx:     ctx,
 		cancel:  cancel,
 		ipTable: make(map[string]struct{}),
 	}
 	go meter.speedUpdater()
-	a.users[hash] = meter
-	return nil
-}
-
-func (a *Authenticator) DelUser(hash string) error {
-	a.Lock()
-	defer a.Unlock()
-	meter, found := a.users[hash]
-	if !found {
-		return fmt.Errorf("hash %v not found", hash)
-	}
-	meter.Close()
-	delete(a.users, hash)
-	return nil
-}
-
-func (a *Authenticator) ListUsers() []*Meter {
-	a.RLock()
-	defer a.RUnlock()
-	result := make([]*Meter, len(a.users))
-	i := 0
-	for _, u := range a.users {
-		result[i] = u
-		i++
-	}
-	return result
-}
-
-func (a *Authenticator) Close() error {
-	return nil
-}
-
-// Create Authenticator from user ids
-func NewAuthenticator(ctx context.Context, userIds []string) (*Authenticator, error) {
-	au := &Authenticator{
-		ctx:   ctx,
-		users: make(map[string]*Meter),
-	}
-	for _, userId := range userIds {
-		au.AddUser(userId)
-	}
-	return au, nil
+	return meter
 }

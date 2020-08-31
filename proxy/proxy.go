@@ -15,7 +15,7 @@ import (
 type Client interface {
 	Name() string
 	Addr() string
-	Handshake(underlay net.Conn, target string) (io.ReadWriter, error)
+	Handshake(underlay net.Conn, target string) (io.ReadWriteCloser, error)
 }
 
 // ClientCreator is a function to create client.
@@ -51,7 +51,7 @@ func ClientFromURL(ctx context.Context, s string) (Client, error) {
 type Server interface {
 	Name() string
 	Addr() string
-	Handshake(underlay net.Conn) (io.ReadWriter, *TargetAddr, error)
+	Handshake(underlay net.Conn) (io.ReadWriteCloser, *TargetAddr, error)
 }
 
 // ServerCreator is a function to create proxy server

@@ -15,12 +15,12 @@ func TestVMess(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	url := "vmess://a684455c-b14f-11ea-bf0d-42010aaa0003@127.0.0.1:9527?alterID=4"
+	url := "vmess://a684455c-b14f-11ea-bf0d-42010aaa0003:4@127.0.0.1:9527"
 	server, err := proxy.ServerFromURL(ctx, url)
 	if err != nil {
 		return
 	}
-	client, err := proxy.ClientFromURL(url)
+	client, err := proxy.ClientFromURL(ctx, url)
 	if err != nil {
 		return
 	}
