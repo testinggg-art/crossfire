@@ -1,5 +1,5 @@
 {
   "local": "socks5://127.0.0.1:1081",
   "route": "whitelist",
-  "remote": "vmesss://a684455c-b14f-11ea-bf0d-42010aaa0003:4@<fix-me>:443"
+  "remote": "vmesss://a684455c-b14f-11ea-bf0d-42010aaa0003:4@<fix-me>:443?api=:11081"
 }

@@ -1,0 +1,83 @@
+syntax = "proto3";
+package api;
+option go_package = ".;api";
+
+message Traffic {
+    uint64 upload_traffic = 1;
+    uint64 download_traffic = 2;
+}
+
+message Speed {
+    uint64 upload_speed = 1;
+    uint64 download_speed = 2;
+}
+
+message User {
+    string hash = 1;
+}
+
+message UserStatus {
+    User user = 1;
+    Traffic traffic_total = 2;
+    Speed speed_current = 3;
+    Speed speed_limit = 4;
+    int32 ip_current = 5;
+    int32 ip_limit = 6;
+}
+
+message GetTrafficRequest {
+    User user = 1;
+}
+
+message GetTrafficResponse {
+    bool success = 1;
+    string info = 2;
+    Traffic traffic_total = 3;
+    Speed speed_current = 4;
+}
+
+message ListUsersRequest {
+
+}
+
+message ListUsersResponse {
+    UserStatus status = 1;
+}
+
+message GetUserRequest {
+    User user = 1;
+}
+
+message GetUserResponse {
+    bool success = 1;
+    string info = 2;
+    UserStatus status = 3;
+}
+
+message SetUserRequest {
+    enum Operation {
+        Add = 0;
+        Delete = 1;
+        Modify = 2;
+    }
+    UserStatus status = 1;
+    Operation operation = 2;
+}
+
+message SetUserResponse {
+    bool success = 1;
+    string info = 2;
+}
+
+service ClientService {
+    rpc GetTraffic(GetTrafficRequest) returns(GetTrafficResponse){}
+}
+
+service ServerService {
+    // list all users
+    rpc ListUsers(ListUsersRequest) returns(stream ListUsersResponse){}
+    // obtain specified user's info
+    rpc GetUser(stream GetUserRequest) returns(stream GetUserResponse){}
+    // setup existing users' config
+    rpc SetUser(stream SetUserRequest) returns(stream SetUserResponse){}
+}

@@ -2,6 +2,8 @@ package common
 
 import (
 	"fmt"
+	"net"
+	"strconv"
 )
 
 const (
@@ -21,4 +23,35 @@ func HumanFriendlyTraffic(bytes uint64) string {
 		return fmt.Sprintf("%.2f MiB", float32(bytes)/MiB)
 	}
 	return fmt.Sprintf("%.2f GiB", float32(bytes)/GiB)
+}
+
+// For testing only
+func PickPort(network string, host string) int {
+	switch network {
+	case "tcp":
+		for retry := 0; retry < 16; retry++ {
+			l, err := net.Listen("tcp", host+":0")
+			if err != nil {
+				continue
+			}
+			defer l.Close()
+			_, port, _ := net.SplitHostPort(l.Addr().String())
+			p, _ := strconv.ParseInt(port, 10, 32)
+			return int(p)
+		}
+	case "udp":
+		for retry := 0; retry < 16; retry++ {
+			conn, err := net.ListenPacket("udp", host+":0")
+			if err != nil {
+				continue
+			}
+			defer conn.Close()
+			_, port, _ := net.SplitHostPort(conn.LocalAddr().String())
+			p, _ := strconv.ParseInt(port, 10, 32)
+			return int(p)
+		}
+	default:
+		return 0
+	}
+	return 0
 }

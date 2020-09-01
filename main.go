@@ -25,6 +25,9 @@ import (
 	_ "github.com/jarvisgally/crossfire/proxy/socks5"
 	_ "github.com/jarvisgally/crossfire/proxy/tls"
 	_ "github.com/jarvisgally/crossfire/proxy/vmess"
+
+	"github.com/jarvisgally/crossfire/control"
+	_ "github.com/jarvisgally/crossfire/control"
 )
 
 var (
@@ -32,7 +35,8 @@ var (
 	version = "0.1.0"
 
 	// Flag
-	f = flag.String("f", "client.json", "config file name")
+	clientMode = flag.Bool("client", true, "Run in client mode")
+	serverMode = flag.Bool("server", false, "Run in server mode")
 )
 
 const (
@@ -77,14 +81,26 @@ func loadConfig(configFileName string) (*Config, error) {
 }
 
 func main() {
-	// 打印版本信息
-	printVersion()
-
 	// 解析命令行参数
 	flag.Parse()
 
-	// 读取配置文件，默认为客户端模式
-	conf, err := loadConfig(*f)
+	// 检测是否需要执行其他命令
+	commands := control.GetCommands()
+	for _, command := range commands {
+		if command.Execute() == nil {
+			os.Exit(0)
+		}
+	}
+
+	// 无执行命令，则表示启动代理程序，打印版本信息
+	printVersion()
+
+	// 根据client和server参数来读取对应的配置文件，从而启动客户端或者服务端模式
+	config := "client.json"
+	if *serverMode {
+		config = "server.json"
+	}
+	conf, err := loadConfig(config)
 	if err != nil {
 		log.Printf("can not load config file: %v", err)
 		os.Exit(-1)

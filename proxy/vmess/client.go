@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jarvisgally/crossfire/api"
 	"github.com/jarvisgally/crossfire/common"
 	"github.com/jarvisgally/crossfire/proxy"
 	"golang.org/x/crypto/chacha20poly1305"
@@ -61,7 +62,12 @@ func NewVmessClient(ctx context.Context, url *url.URL) (proxy.Client, error) {
 	c.users = append(c.users, user)
 	c.users = append(c.users, user.GenAlterIDUsers(int(alterID))...)
 
+	// Run API service
 	c.meter = proxy.NewMeter(ctx, uuidStr)
+	apiListenAddr := query.Get("api")
+	if apiListenAddr != "" {
+		go api.RunClientAPI(ctx, c.meter, apiListenAddr)
+	}
 
 	c.opt = OptChunkStream
 	security = strings.ToLower(security)
