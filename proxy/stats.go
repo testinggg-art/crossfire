@@ -10,7 +10,7 @@ import (
 )
 
 type Meter struct {
-	hash string // Identification of a user, can be UUID or string
+	hash string // Identification of a user
 
 	sent        uint64
 	recv        uint64

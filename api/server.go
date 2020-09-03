@@ -4,20 +4,22 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/jarvisgally/crossfire/proxy"
-	"google.golang.org/grpc"
 	"io"
 	"log"
 	"net"
+
+	"github.com/jarvisgally/crossfire/proxy"
+	"google.golang.org/grpc"
 )
 
+// API for CrossFire server
 type ServerAPI struct {
 	ServerServiceServer
 	auth *proxy.Authenticator
 }
 
-func (s *ServerAPI) GetUser(stream ServerService_GetUserServer) error {
-	log.Print("API: GetUser")
+func (s *ServerAPI) GetUsers(stream ServerService_GetUsersServer) error {
+	log.Print("API: GetUsers")
 	for {
 		req, err := stream.Recv()
 		if err == io.EOF {
@@ -31,18 +33,24 @@ func (s *ServerAPI) GetUser(stream ServerService_GetUserServer) error {
 		}
 		valid, user := s.auth.AuthUser(req.User.Hash)
 		if !valid {
-			stream.Send(&GetUserResponse{
+			stream.Send(&GetUsersResponse{
 				Success: false,
 				Info:    "invalid user: " + req.User.Hash,
 			})
 			continue
 		}
-		downloadTraffic, uploadTraffic := user.GetTraffic()
+		// In server mode, sent -> download, recv -> upload
+		var downloadTraffic, uploadTraffic uint64
+		if req.Reset_ {
+			downloadTraffic, uploadTraffic = user.GetAndResetTraffic()
+		} else {
+			downloadTraffic, uploadTraffic = user.GetTraffic()
+		}
 		downloadSpeed, uploadSpeed := user.GetSpeed()
 		downloadSpeedLimit, uploadSpeedLimit := user.GetSpeedLimit()
 		ipLimit := user.GetIPLimit()
 		ipCurrent := user.GetIP()
-		err = stream.Send(&GetUserResponse{
+		err = stream.Send(&GetUsersResponse{
 			Success: true,
 			Status: &UserStatus{
 				User: req.User,
@@ -68,8 +76,8 @@ func (s *ServerAPI) GetUser(stream ServerService_GetUserServer) error {
 	}
 }
 
-func (s *ServerAPI) SetUser(stream ServerService_SetUserServer) error {
-	log.Print("API: SetUser")
+func (s *ServerAPI) SetUsers(stream ServerService_SetUsersServer) error {
+	log.Print("API: SetUsers")
 	for {
 		req, err := stream.Recv()
 		if err == io.EOF {
@@ -82,7 +90,7 @@ func (s *ServerAPI) SetUser(stream ServerService_SetUserServer) error {
 			return errors.New("status is unspecified")
 		}
 		switch req.Operation {
-		case SetUserRequest_Add:
+		case SetUsersRequest_Add:
 			if err = s.auth.AddUser(req.Status.User.Hash); err != nil {
 				err = fmt.Errorf("failed to add new user: %w", err)
 				break
@@ -101,9 +109,9 @@ func (s *ServerAPI) SetUser(stream ServerService_SetUserServer) error {
 				}
 				user.SetIPLimit(int(req.Status.IpLimit))
 			}
-		case SetUserRequest_Delete:
+		case SetUsersRequest_Delete:
 			err = s.auth.DelUser(req.Status.User.Hash)
-		case SetUserRequest_Modify:
+		case SetUsersRequest_Modify:
 			valid, user := s.auth.AuthUser(req.Status.User.Hash)
 			if !valid {
 				err = fmt.Errorf("invalid user: %v", req.Status.User.Hash)
@@ -118,13 +126,13 @@ func (s *ServerAPI) SetUser(stream ServerService_SetUserServer) error {
 			}
 		}
 		if err != nil {
-			stream.Send(&SetUserResponse{
+			stream.Send(&SetUsersResponse{
 				Success: false,
 				Info:    err.Error(),
 			})
 			continue
 		}
-		stream.Send(&SetUserResponse{
+		stream.Send(&SetUsersResponse{
 			Success: true,
 		})
 	}
@@ -134,7 +142,12 @@ func (s *ServerAPI) ListUsers(req *ListUsersRequest, stream ServerService_ListUs
 	log.Print("API: ListUsers")
 	users := s.auth.ListUsers()
 	for _, user := range users {
-		downloadTraffic, uploadTraffic := user.GetTraffic()
+		var downloadTraffic, uploadTraffic uint64
+		if req.Reset_ {
+			downloadTraffic, uploadTraffic = user.GetAndResetTraffic()
+		} else {
+			downloadTraffic, uploadTraffic = user.GetTraffic()
+		}
 		downloadSpeed, uploadSpeed := user.GetSpeed()
 		downloadSpeedLimit, uploadSpeedLimit := user.GetSpeedLimit()
 		ipLimit := user.GetIPLimit()

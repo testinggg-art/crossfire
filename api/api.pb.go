@@ -29,52 +29,52 @@ const (
 // of the legacy proto package is being used.
 const _ = proto.ProtoPackageIsVersion4
 
-type SetUserRequest_Operation int32
+type SetUsersRequest_Operation int32
 
 const (
-	SetUserRequest_Add    SetUserRequest_Operation = 0
-	SetUserRequest_Delete SetUserRequest_Operation = 1
-	SetUserRequest_Modify SetUserRequest_Operation = 2
+	SetUsersRequest_Add    SetUsersRequest_Operation = 0
+	SetUsersRequest_Delete SetUsersRequest_Operation = 1
+	SetUsersRequest_Modify SetUsersRequest_Operation = 2
 )
 
-// Enum value maps for SetUserRequest_Operation.
+// Enum value maps for SetUsersRequest_Operation.
 var (
-	SetUserRequest_Operation_name = map[int32]string{
+	SetUsersRequest_Operation_name = map[int32]string{
 		0: "Add",
 		1: "Delete",
 		2: "Modify",
 	}
-	SetUserRequest_Operation_value = map[string]int32{
+	SetUsersRequest_Operation_value = map[string]int32{
 		"Add":    0,
 		"Delete": 1,
 		"Modify": 2,
 	}
 )
 
-func (x SetUserRequest_Operation) Enum() *SetUserRequest_Operation {
-	p := new(SetUserRequest_Operation)
+func (x SetUsersRequest_Operation) Enum() *SetUsersRequest_Operation {
+	p := new(SetUsersRequest_Operation)
 	*p = x
 	return p
 }
 
-func (x SetUserRequest_Operation) String() string {
+func (x SetUsersRequest_Operation) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-func (SetUserRequest_Operation) Descriptor() protoreflect.EnumDescriptor {
+func (SetUsersRequest_Operation) Descriptor() protoreflect.EnumDescriptor {
 	return file_api_proto_enumTypes[0].Descriptor()
 }
 
-func (SetUserRequest_Operation) Type() protoreflect.EnumType {
+func (SetUsersRequest_Operation) Type() protoreflect.EnumType {
 	return &file_api_proto_enumTypes[0]
 }
 
-func (x SetUserRequest_Operation) Number() protoreflect.EnumNumber {
+func (x SetUsersRequest_Operation) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use SetUserRequest_Operation.Descriptor instead.
-func (SetUserRequest_Operation) EnumDescriptor() ([]byte, []int) {
+// Deprecated: Use SetUsersRequest_Operation.Descriptor instead.
+func (SetUsersRequest_Operation) EnumDescriptor() ([]byte, []int) {
 	return file_api_proto_rawDescGZIP(), []int{10, 0}
 }
 
@@ -444,6 +444,8 @@ type ListUsersRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
+
+	Reset_ bool `protobuf:"varint,1,opt,name=reset,proto3" json:"reset,omitempty"`
 }
 
 func (x *ListUsersRequest) Reset() {
@@ -476,6 +478,13 @@ func (x *ListUsersRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ListUsersRequest.ProtoReflect.Descriptor instead.
 func (*ListUsersRequest) Descriptor() ([]byte, []int) {
 	return file_api_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ListUsersRequest) GetReset_() bool {
+	if x != nil {
+		return x.Reset_
+	}
+	return false
 }
 
 type ListUsersResponse struct {
@@ -525,16 +534,17 @@ func (x *ListUsersResponse) GetStatus() *UserStatus {
 	return nil
 }
 
-type GetUserRequest struct {
+type GetUsersRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	User *User `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	User   *User `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	Reset_ bool  `protobuf:"varint,2,opt,name=reset,proto3" json:"reset,omitempty"`
 }
 
-func (x *GetUserRequest) Reset() {
-	*x = GetUserRequest{}
+func (x *GetUsersRequest) Reset() {
+	*x = GetUsersRequest{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_api_proto_msgTypes[8]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -542,13 +552,13 @@ func (x *GetUserRequest) Reset() {
 	}
 }
 
-func (x *GetUserRequest) String() string {
+func (x *GetUsersRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetUserRequest) ProtoMessage() {}
+func (*GetUsersRequest) ProtoMessage() {}
 
-func (x *GetUserRequest) ProtoReflect() protoreflect.Message {
+func (x *GetUsersRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_api_proto_msgTypes[8]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -560,19 +570,26 @@ func (x *GetUserRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetUserRequest.ProtoReflect.Descriptor instead.
-func (*GetUserRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use GetUsersRequest.ProtoReflect.Descriptor instead.
+func (*GetUsersRequest) Descriptor() ([]byte, []int) {
 	return file_api_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *GetUserRequest) GetUser() *User {
+func (x *GetUsersRequest) GetUser() *User {
 	if x != nil {
 		return x.User
 	}
 	return nil
 }
 
-type GetUserResponse struct {
+func (x *GetUsersRequest) GetReset_() bool {
+	if x != nil {
+		return x.Reset_
+	}
+	return false
+}
+
+type GetUsersResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -582,8 +599,8 @@ type GetUserResponse struct {
 	Status  *UserStatus `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
 }
 
-func (x *GetUserResponse) Reset() {
-	*x = GetUserResponse{}
+func (x *GetUsersResponse) Reset() {
+	*x = GetUsersResponse{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_api_proto_msgTypes[9]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -591,13 +608,13 @@ func (x *GetUserResponse) Reset() {
 	}
 }
 
-func (x *GetUserResponse) String() string {
+func (x *GetUsersResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetUserResponse) ProtoMessage() {}
+func (*GetUsersResponse) ProtoMessage() {}
 
-func (x *GetUserResponse) ProtoReflect() protoreflect.Message {
+func (x *GetUsersResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_api_proto_msgTypes[9]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -609,43 +626,43 @@ func (x *GetUserResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetUserResponse.ProtoReflect.Descriptor instead.
-func (*GetUserResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use GetUsersResponse.ProtoReflect.Descriptor instead.
+func (*GetUsersResponse) Descriptor() ([]byte, []int) {
 	return file_api_proto_rawDescGZIP(), []int{9}
 }
 
-func (x *GetUserResponse) GetSuccess() bool {
+func (x *GetUsersResponse) GetSuccess() bool {
 	if x != nil {
 		return x.Success
 	}
 	return false
 }
 
-func (x *GetUserResponse) GetInfo() string {
+func (x *GetUsersResponse) GetInfo() string {
 	if x != nil {
 		return x.Info
 	}
 	return ""
 }
 
-func (x *GetUserResponse) GetStatus() *UserStatus {
+func (x *GetUsersResponse) GetStatus() *UserStatus {
 	if x != nil {
 		return x.Status
 	}
 	return nil
 }
 
-type SetUserRequest struct {
+type SetUsersRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Status    *UserStatus              `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
-	Operation SetUserRequest_Operation `protobuf:"varint,2,opt,name=operation,proto3,enum=api.SetUserRequest_Operation" json:"operation,omitempty"`
+	Status    *UserStatus               `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Operation SetUsersRequest_Operation `protobuf:"varint,2,opt,name=operation,proto3,enum=api.SetUsersRequest_Operation" json:"operation,omitempty"`
 }
 
-func (x *SetUserRequest) Reset() {
-	*x = SetUserRequest{}
+func (x *SetUsersRequest) Reset() {
+	*x = SetUsersRequest{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_api_proto_msgTypes[10]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -653,13 +670,13 @@ func (x *SetUserRequest) Reset() {
 	}
 }
 
-func (x *SetUserRequest) String() string {
+func (x *SetUsersRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*SetUserRequest) ProtoMessage() {}
+func (*SetUsersRequest) ProtoMessage() {}
 
-func (x *SetUserRequest) ProtoReflect() protoreflect.Message {
+func (x *SetUsersRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_api_proto_msgTypes[10]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -671,26 +688,26 @@ func (x *SetUserRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use SetUserRequest.ProtoReflect.Descriptor instead.
-func (*SetUserRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use SetUsersRequest.ProtoReflect.Descriptor instead.
+func (*SetUsersRequest) Descriptor() ([]byte, []int) {
 	return file_api_proto_rawDescGZIP(), []int{10}
 }
 
-func (x *SetUserRequest) GetStatus() *UserStatus {
+func (x *SetUsersRequest) GetStatus() *UserStatus {
 	if x != nil {
 		return x.Status
 	}
 	return nil
 }
 
-func (x *SetUserRequest) GetOperation() SetUserRequest_Operation {
+func (x *SetUsersRequest) GetOperation() SetUsersRequest_Operation {
 	if x != nil {
 		return x.Operation
 	}
-	return SetUserRequest_Add
+	return SetUsersRequest_Add
 }
 
-type SetUserResponse struct {
+type SetUsersResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -699,8 +716,8 @@ type SetUserResponse struct {
 	Info    string `protobuf:"bytes,2,opt,name=info,proto3" json:"info,omitempty"`
 }
 
-func (x *SetUserResponse) Reset() {
-	*x = SetUserResponse{}
+func (x *SetUsersResponse) Reset() {
+	*x = SetUsersResponse{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_api_proto_msgTypes[11]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -708,13 +725,13 @@ func (x *SetUserResponse) Reset() {
 	}
 }
 
-func (x *SetUserResponse) String() string {
+func (x *SetUsersResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*SetUserResponse) ProtoMessage() {}
+func (*SetUsersResponse) ProtoMessage() {}
 
-func (x *SetUserResponse) ProtoReflect() protoreflect.Message {
+func (x *SetUsersResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_api_proto_msgTypes[11]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -726,19 +743,19 @@ func (x *SetUserResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use SetUserResponse.ProtoReflect.Descriptor instead.
-func (*SetUserResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use SetUsersResponse.ProtoReflect.Descriptor instead.
+func (*SetUsersResponse) Descriptor() ([]byte, []int) {
 	return file_api_proto_rawDescGZIP(), []int{11}
 }
 
-func (x *SetUserResponse) GetSuccess() bool {
+func (x *SetUsersResponse) GetSuccess() bool {
 	if x != nil {
 		return x.Success
 	}
 	return false
 }
 
-func (x *SetUserResponse) GetInfo() string {
+func (x *SetUsersResponse) GetInfo() string {
 	if x != nil {
 		return x.Info
 	}
@@ -791,55 +808,58 @@ var file_api_proto_rawDesc = []byte{
 	0x6c, 0x12, 0x2f, 0x0a, 0x0d, 0x73, 0x70, 0x65, 0x65, 0x64, 0x5f, 0x63, 0x75, 0x72, 0x72, 0x65,
 	0x6e, 0x74, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0a, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x53,
 	0x70, 0x65, 0x65, 0x64, 0x52, 0x0c, 0x73, 0x70, 0x65, 0x65, 0x64, 0x43, 0x75, 0x72, 0x72, 0x65,
-	0x6e, 0x74, 0x22, 0x12, 0x0a, 0x10, 0x4c, 0x69, 0x73, 0x74, 0x55, 0x73, 0x65, 0x72, 0x73, 0x52,
-	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x22, 0x3c, 0x0a, 0x11, 0x4c, 0x69, 0x73, 0x74, 0x55, 0x73,
-	0x65, 0x72, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x27, 0x0a, 0x06, 0x73,
-	0x74, 0x61, 0x74, 0x75, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0f, 0x2e, 0x61, 0x70,
-	0x69, 0x2e, 0x55, 0x73, 0x65, 0x72, 0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x52, 0x06, 0x73, 0x74,
-	0x61, 0x74, 0x75, 0x73, 0x22, 0x2f, 0x0a, 0x0e, 0x47, 0x65, 0x74, 0x55, 0x73, 0x65, 0x72, 0x52,
-	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x1d, 0x0a, 0x04, 0x75, 0x73, 0x65, 0x72, 0x18, 0x01,
-	0x20, 0x01, 0x28, 0x0b, 0x32, 0x09, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x55, 0x73, 0x65, 0x72, 0x52,
-	0x04, 0x75, 0x73, 0x65, 0x72, 0x22, 0x68, 0x0a, 0x0f, 0x47, 0x65, 0x74, 0x55, 0x73, 0x65, 0x72,
-	0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x73, 0x75, 0x63, 0x63,
-	0x65, 0x73, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x08, 0x52, 0x07, 0x73, 0x75, 0x63, 0x63, 0x65,
-	0x73, 0x73, 0x12, 0x12, 0x0a, 0x04, 0x69, 0x6e, 0x66, 0x6f, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09,
-	0x52, 0x04, 0x69, 0x6e, 0x66, 0x6f, 0x12, 0x27, 0x0a, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73,
-	0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0f, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x55, 0x73, 0x65,
-	0x72, 0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x52, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x22,
-	0xa4, 0x01, 0x0a, 0x0e, 0x53, 0x65, 0x74, 0x55, 0x73, 0x65, 0x72, 0x52, 0x65, 0x71, 0x75, 0x65,
-	0x73, 0x74, 0x12, 0x27, 0x0a, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x18, 0x01, 0x20, 0x01,
-	0x28, 0x0b, 0x32, 0x0f, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x55, 0x73, 0x65, 0x72, 0x53, 0x74, 0x61,
-	0x74, 0x75, 0x73, 0x52, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x12, 0x3b, 0x0a, 0x09, 0x6f,
-	0x70, 0x65, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x1d,
-	0x2e, 0x61, 0x70, 0x69, 0x2e, 0x53, 0x65, 0x74, 0x55, 0x73, 0x65, 0x72, 0x52, 0x65, 0x71, 0x75,
+	0x6e, 0x74, 0x22, 0x28, 0x0a, 0x10, 0x4c, 0x69, 0x73, 0x74, 0x55, 0x73, 0x65, 0x72, 0x73, 0x52,
+	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x14, 0x0a, 0x05, 0x72, 0x65, 0x73, 0x65, 0x74, 0x18,
+	0x01, 0x20, 0x01, 0x28, 0x08, 0x52, 0x05, 0x72, 0x65, 0x73, 0x65, 0x74, 0x22, 0x3c, 0x0a, 0x11,
+	0x4c, 0x69, 0x73, 0x74, 0x55, 0x73, 0x65, 0x72, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73,
+	0x65, 0x12, 0x27, 0x0a, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28,
+	0x0b, 0x32, 0x0f, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x55, 0x73, 0x65, 0x72, 0x53, 0x74, 0x61, 0x74,
+	0x75, 0x73, 0x52, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x22, 0x46, 0x0a, 0x0f, 0x47, 0x65,
+	0x74, 0x55, 0x73, 0x65, 0x72, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x1d, 0x0a,
+	0x04, 0x75, 0x73, 0x65, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x09, 0x2e, 0x61, 0x70,
+	0x69, 0x2e, 0x55, 0x73, 0x65, 0x72, 0x52, 0x04, 0x75, 0x73, 0x65, 0x72, 0x12, 0x14, 0x0a, 0x05,
+	0x72, 0x65, 0x73, 0x65, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x08, 0x52, 0x05, 0x72, 0x65, 0x73,
+	0x65, 0x74, 0x22, 0x69, 0x0a, 0x10, 0x47, 0x65, 0x74, 0x55, 0x73, 0x65, 0x72, 0x73, 0x52, 0x65,
+	0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x73, 0x75, 0x63, 0x63, 0x65, 0x73,
+	0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x08, 0x52, 0x07, 0x73, 0x75, 0x63, 0x63, 0x65, 0x73, 0x73,
+	0x12, 0x12, 0x0a, 0x04, 0x69, 0x6e, 0x66, 0x6f, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04,
+	0x69, 0x6e, 0x66, 0x6f, 0x12, 0x27, 0x0a, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x18, 0x03,
+	0x20, 0x01, 0x28, 0x0b, 0x32, 0x0f, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x55, 0x73, 0x65, 0x72, 0x53,
+	0x74, 0x61, 0x74, 0x75, 0x73, 0x52, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x22, 0xa6, 0x01,
+	0x0a, 0x0f, 0x53, 0x65, 0x74, 0x55, 0x73, 0x65, 0x72, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73,
+	0x74, 0x12, 0x27, 0x0a, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28,
+	0x0b, 0x32, 0x0f, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x55, 0x73, 0x65, 0x72, 0x53, 0x74, 0x61, 0x74,
+	0x75, 0x73, 0x52, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x12, 0x3c, 0x0a, 0x09, 0x6f, 0x70,
+	0x65, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x1e, 0x2e,
+	0x61, 0x70, 0x69, 0x2e, 0x53, 0x65, 0x74, 0x55, 0x73, 0x65, 0x72, 0x73, 0x52, 0x65, 0x71, 0x75,
 	0x65, 0x73, 0x74, 0x2e, 0x4f, 0x70, 0x65, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x52, 0x09, 0x6f,
 	0x70, 0x65, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x22, 0x2c, 0x0a, 0x09, 0x4f, 0x70, 0x65, 0x72,
 	0x61, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x07, 0x0a, 0x03, 0x41, 0x64, 0x64, 0x10, 0x00, 0x12, 0x0a,
 	0x0a, 0x06, 0x44, 0x65, 0x6c, 0x65, 0x74, 0x65, 0x10, 0x01, 0x12, 0x0a, 0x0a, 0x06, 0x4d, 0x6f,
-	0x64, 0x69, 0x66, 0x79, 0x10, 0x02, 0x22, 0x3f, 0x0a, 0x0f, 0x53, 0x65, 0x74, 0x55, 0x73, 0x65,
-	0x72, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x73, 0x75, 0x63,
-	0x63, 0x65, 0x73, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x08, 0x52, 0x07, 0x73, 0x75, 0x63, 0x63,
-	0x65, 0x73, 0x73, 0x12, 0x12, 0x0a, 0x04, 0x69, 0x6e, 0x66, 0x6f, 0x18, 0x02, 0x20, 0x01, 0x28,
-	0x09, 0x52, 0x04, 0x69, 0x6e, 0x66, 0x6f, 0x32, 0x50, 0x0a, 0x0d, 0x43, 0x6c, 0x69, 0x65, 0x6e,
-	0x74, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x3f, 0x0a, 0x0a, 0x47, 0x65, 0x74, 0x54,
-	0x72, 0x61, 0x66, 0x66, 0x69, 0x63, 0x12, 0x16, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x47, 0x65, 0x74,
-	0x54, 0x72, 0x61, 0x66, 0x66, 0x69, 0x63, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x17,
-	0x2e, 0x61, 0x70, 0x69, 0x2e, 0x47, 0x65, 0x74, 0x54, 0x72, 0x61, 0x66, 0x66, 0x69, 0x63, 0x52,
-	0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x32, 0xc7, 0x01, 0x0a, 0x0d, 0x53, 0x65,
-	0x72, 0x76, 0x65, 0x72, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x3e, 0x0a, 0x09, 0x4c,
-	0x69, 0x73, 0x74, 0x55, 0x73, 0x65, 0x72, 0x73, 0x12, 0x15, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x4c,
-	0x69, 0x73, 0x74, 0x55, 0x73, 0x65, 0x72, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a,
-	0x16, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x4c, 0x69, 0x73, 0x74, 0x55, 0x73, 0x65, 0x72, 0x73, 0x52,
-	0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x30, 0x01, 0x12, 0x3a, 0x0a, 0x07, 0x47,
-	0x65, 0x74, 0x55, 0x73, 0x65, 0x72, 0x12, 0x13, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x47, 0x65, 0x74,
-	0x55, 0x73, 0x65, 0x72, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x14, 0x2e, 0x61, 0x70,
-	0x69, 0x2e, 0x47, 0x65, 0x74, 0x55, 0x73, 0x65, 0x72, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73,
-	0x65, 0x22, 0x00, 0x28, 0x01, 0x30, 0x01, 0x12, 0x3a, 0x0a, 0x07, 0x53, 0x65, 0x74, 0x55, 0x73,
-	0x65, 0x72, 0x12, 0x13, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x53, 0x65, 0x74, 0x55, 0x73, 0x65, 0x72,
-	0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x14, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x53, 0x65,
-	0x74, 0x55, 0x73, 0x65, 0x72, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x28,
-	0x01, 0x30, 0x01, 0x42, 0x07, 0x5a, 0x05, 0x2e, 0x3b, 0x61, 0x70, 0x69, 0x62, 0x06, 0x70, 0x72,
-	0x6f, 0x74, 0x6f, 0x33,
+	0x64, 0x69, 0x66, 0x79, 0x10, 0x02, 0x22, 0x40, 0x0a, 0x10, 0x53, 0x65, 0x74, 0x55, 0x73, 0x65,
+	0x72, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x73, 0x75,
+	0x63, 0x63, 0x65, 0x73, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x08, 0x52, 0x07, 0x73, 0x75, 0x63,
+	0x63, 0x65, 0x73, 0x73, 0x12, 0x12, 0x0a, 0x04, 0x69, 0x6e, 0x66, 0x6f, 0x18, 0x02, 0x20, 0x01,
+	0x28, 0x09, 0x52, 0x04, 0x69, 0x6e, 0x66, 0x6f, 0x32, 0x50, 0x0a, 0x0d, 0x43, 0x6c, 0x69, 0x65,
+	0x6e, 0x74, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x3f, 0x0a, 0x0a, 0x47, 0x65, 0x74,
+	0x54, 0x72, 0x61, 0x66, 0x66, 0x69, 0x63, 0x12, 0x16, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x47, 0x65,
+	0x74, 0x54, 0x72, 0x61, 0x66, 0x66, 0x69, 0x63, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a,
+	0x17, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x47, 0x65, 0x74, 0x54, 0x72, 0x61, 0x66, 0x66, 0x69, 0x63,
+	0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x32, 0xcd, 0x01, 0x0a, 0x0d, 0x53,
+	0x65, 0x72, 0x76, 0x65, 0x72, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x3e, 0x0a, 0x09,
+	0x4c, 0x69, 0x73, 0x74, 0x55, 0x73, 0x65, 0x72, 0x73, 0x12, 0x15, 0x2e, 0x61, 0x70, 0x69, 0x2e,
+	0x4c, 0x69, 0x73, 0x74, 0x55, 0x73, 0x65, 0x72, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74,
+	0x1a, 0x16, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x4c, 0x69, 0x73, 0x74, 0x55, 0x73, 0x65, 0x72, 0x73,
+	0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x30, 0x01, 0x12, 0x3d, 0x0a, 0x08,
+	0x47, 0x65, 0x74, 0x55, 0x73, 0x65, 0x72, 0x73, 0x12, 0x14, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x47,
+	0x65, 0x74, 0x55, 0x73, 0x65, 0x72, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x15,
+	0x2e, 0x61, 0x70, 0x69, 0x2e, 0x47, 0x65, 0x74, 0x55, 0x73, 0x65, 0x72, 0x73, 0x52, 0x65, 0x73,
+	0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x28, 0x01, 0x30, 0x01, 0x12, 0x3d, 0x0a, 0x08, 0x53,
+	0x65, 0x74, 0x55, 0x73, 0x65, 0x72, 0x73, 0x12, 0x14, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x53, 0x65,
+	0x74, 0x55, 0x73, 0x65, 0x72, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x15, 0x2e,
+	0x61, 0x70, 0x69, 0x2e, 0x53, 0x65, 0x74, 0x55, 0x73, 0x65, 0x72, 0x73, 0x52, 0x65, 0x73, 0x70,
+	0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x28, 0x01, 0x30, 0x01, 0x42, 0x07, 0x5a, 0x05, 0x2e, 0x3b,
+	0x61, 0x70, 0x69, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -857,19 +877,19 @@ func file_api_proto_rawDescGZIP() []byte {
 var file_api_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_api_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_api_proto_goTypes = []interface{}{
-	(SetUserRequest_Operation)(0), // 0: api.SetUserRequest.Operation
-	(*Traffic)(nil),               // 1: api.Traffic
-	(*Speed)(nil),                 // 2: api.Speed
-	(*User)(nil),                  // 3: api.User
-	(*UserStatus)(nil),            // 4: api.UserStatus
-	(*GetTrafficRequest)(nil),     // 5: api.GetTrafficRequest
-	(*GetTrafficResponse)(nil),    // 6: api.GetTrafficResponse
-	(*ListUsersRequest)(nil),      // 7: api.ListUsersRequest
-	(*ListUsersResponse)(nil),     // 8: api.ListUsersResponse
-	(*GetUserRequest)(nil),        // 9: api.GetUserRequest
-	(*GetUserResponse)(nil),       // 10: api.GetUserResponse
-	(*SetUserRequest)(nil),        // 11: api.SetUserRequest
-	(*SetUserResponse)(nil),       // 12: api.SetUserResponse
+	(SetUsersRequest_Operation)(0), // 0: api.SetUsersRequest.Operation
+	(*Traffic)(nil),                // 1: api.Traffic
+	(*Speed)(nil),                  // 2: api.Speed
+	(*User)(nil),                   // 3: api.User
+	(*UserStatus)(nil),             // 4: api.UserStatus
+	(*GetTrafficRequest)(nil),      // 5: api.GetTrafficRequest
+	(*GetTrafficResponse)(nil),     // 6: api.GetTrafficResponse
+	(*ListUsersRequest)(nil),       // 7: api.ListUsersRequest
+	(*ListUsersResponse)(nil),      // 8: api.ListUsersResponse
+	(*GetUsersRequest)(nil),        // 9: api.GetUsersRequest
+	(*GetUsersResponse)(nil),       // 10: api.GetUsersResponse
+	(*SetUsersRequest)(nil),        // 11: api.SetUsersRequest
+	(*SetUsersResponse)(nil),       // 12: api.SetUsersResponse
 }
 var file_api_proto_depIdxs = []int32{
 	3,  // 0: api.UserStatus.user:type_name -> api.User
@@ -880,18 +900,18 @@ var file_api_proto_depIdxs = []int32{
 	1,  // 5: api.GetTrafficResponse.traffic_total:type_name -> api.Traffic
 	2,  // 6: api.GetTrafficResponse.speed_current:type_name -> api.Speed
 	4,  // 7: api.ListUsersResponse.status:type_name -> api.UserStatus
-	3,  // 8: api.GetUserRequest.user:type_name -> api.User
-	4,  // 9: api.GetUserResponse.status:type_name -> api.UserStatus
-	4,  // 10: api.SetUserRequest.status:type_name -> api.UserStatus
-	0,  // 11: api.SetUserRequest.operation:type_name -> api.SetUserRequest.Operation
+	3,  // 8: api.GetUsersRequest.user:type_name -> api.User
+	4,  // 9: api.GetUsersResponse.status:type_name -> api.UserStatus
+	4,  // 10: api.SetUsersRequest.status:type_name -> api.UserStatus
+	0,  // 11: api.SetUsersRequest.operation:type_name -> api.SetUsersRequest.Operation
 	5,  // 12: api.ClientService.GetTraffic:input_type -> api.GetTrafficRequest
 	7,  // 13: api.ServerService.ListUsers:input_type -> api.ListUsersRequest
-	9,  // 14: api.ServerService.GetUser:input_type -> api.GetUserRequest
-	11, // 15: api.ServerService.SetUser:input_type -> api.SetUserRequest
+	9,  // 14: api.ServerService.GetUsers:input_type -> api.GetUsersRequest
+	11, // 15: api.ServerService.SetUsers:input_type -> api.SetUsersRequest
 	6,  // 16: api.ClientService.GetTraffic:output_type -> api.GetTrafficResponse
 	8,  // 17: api.ServerService.ListUsers:output_type -> api.ListUsersResponse
-	10, // 18: api.ServerService.GetUser:output_type -> api.GetUserResponse
-	12, // 19: api.ServerService.SetUser:output_type -> api.SetUserResponse
+	10, // 18: api.ServerService.GetUsers:output_type -> api.GetUsersResponse
+	12, // 19: api.ServerService.SetUsers:output_type -> api.SetUsersResponse
 	16, // [16:20] is the sub-list for method output_type
 	12, // [12:16] is the sub-list for method input_type
 	12, // [12:12] is the sub-list for extension type_name
@@ -1002,7 +1022,7 @@ func file_api_proto_init() {
 			}
 		}
 		file_api_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetUserRequest); i {
+			switch v := v.(*GetUsersRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1014,7 +1034,7 @@ func file_api_proto_init() {
 			}
 		}
 		file_api_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetUserResponse); i {
+			switch v := v.(*GetUsersResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1026,7 +1046,7 @@ func file_api_proto_init() {
 			}
 		}
 		file_api_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*SetUserRequest); i {
+			switch v := v.(*SetUsersRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1038,7 +1058,7 @@ func file_api_proto_init() {
 			}
 		}
 		file_api_proto_msgTypes[11].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*SetUserResponse); i {
+			switch v := v.(*SetUsersResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1158,9 +1178,9 @@ type ServerServiceClient interface {
 	// list all users
 	ListUsers(ctx context.Context, in *ListUsersRequest, opts ...grpc.CallOption) (ServerService_ListUsersClient, error)
 	// obtain specified user's info
-	GetUser(ctx context.Context, opts ...grpc.CallOption) (ServerService_GetUserClient, error)
+	GetUsers(ctx context.Context, opts ...grpc.CallOption) (ServerService_GetUsersClient, error)
 	// setup existing users' config
-	SetUser(ctx context.Context, opts ...grpc.CallOption) (ServerService_SetUserClient, error)
+	SetUsers(ctx context.Context, opts ...grpc.CallOption) (ServerService_SetUsersClient, error)
 }
 
 type serverServiceClient struct {
@@ -1203,62 +1223,62 @@ func (x *serverServiceListUsersClient) Recv() (*ListUsersResponse, error) {
 	return m, nil
 }
 
-func (c *serverServiceClient) GetUser(ctx context.Context, opts ...grpc.CallOption) (ServerService_GetUserClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_ServerService_serviceDesc.Streams[1], "/api.ServerService/GetUser", opts...)
+func (c *serverServiceClient) GetUsers(ctx context.Context, opts ...grpc.CallOption) (ServerService_GetUsersClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_ServerService_serviceDesc.Streams[1], "/api.ServerService/GetUsers", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &serverServiceGetUserClient{stream}
+	x := &serverServiceGetUsersClient{stream}
 	return x, nil
 }
 
-type ServerService_GetUserClient interface {
-	Send(*GetUserRequest) error
-	Recv() (*GetUserResponse, error)
+type ServerService_GetUsersClient interface {
+	Send(*GetUsersRequest) error
+	Recv() (*GetUsersResponse, error)
 	grpc.ClientStream
 }
 
-type serverServiceGetUserClient struct {
+type serverServiceGetUsersClient struct {
 	grpc.ClientStream
 }
 
-func (x *serverServiceGetUserClient) Send(m *GetUserRequest) error {
+func (x *serverServiceGetUsersClient) Send(m *GetUsersRequest) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *serverServiceGetUserClient) Recv() (*GetUserResponse, error) {
-	m := new(GetUserResponse)
+func (x *serverServiceGetUsersClient) Recv() (*GetUsersResponse, error) {
+	m := new(GetUsersResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func (c *serverServiceClient) SetUser(ctx context.Context, opts ...grpc.CallOption) (ServerService_SetUserClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_ServerService_serviceDesc.Streams[2], "/api.ServerService/SetUser", opts...)
+func (c *serverServiceClient) SetUsers(ctx context.Context, opts ...grpc.CallOption) (ServerService_SetUsersClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_ServerService_serviceDesc.Streams[2], "/api.ServerService/SetUsers", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &serverServiceSetUserClient{stream}
+	x := &serverServiceSetUsersClient{stream}
 	return x, nil
 }
 
-type ServerService_SetUserClient interface {
-	Send(*SetUserRequest) error
-	Recv() (*SetUserResponse, error)
+type ServerService_SetUsersClient interface {
+	Send(*SetUsersRequest) error
+	Recv() (*SetUsersResponse, error)
 	grpc.ClientStream
 }
 
-type serverServiceSetUserClient struct {
+type serverServiceSetUsersClient struct {
 	grpc.ClientStream
 }
 
-func (x *serverServiceSetUserClient) Send(m *SetUserRequest) error {
+func (x *serverServiceSetUsersClient) Send(m *SetUsersRequest) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *serverServiceSetUserClient) Recv() (*SetUserResponse, error) {
-	m := new(SetUserResponse)
+func (x *serverServiceSetUsersClient) Recv() (*SetUsersResponse, error) {
+	m := new(SetUsersResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -1270,9 +1290,9 @@ type ServerServiceServer interface {
 	// list all users
 	ListUsers(*ListUsersRequest, ServerService_ListUsersServer) error
 	// obtain specified user's info
-	GetUser(ServerService_GetUserServer) error
+	GetUsers(ServerService_GetUsersServer) error
 	// setup existing users' config
-	SetUser(ServerService_SetUserServer) error
+	SetUsers(ServerService_SetUsersServer) error
 }
 
 // UnimplementedServerServiceServer can be embedded to have forward compatible implementations.
@@ -1282,11 +1302,11 @@ type UnimplementedServerServiceServer struct {
 func (*UnimplementedServerServiceServer) ListUsers(*ListUsersRequest, ServerService_ListUsersServer) error {
 	return status.Errorf(codes.Unimplemented, "method ListUsers not implemented")
 }
-func (*UnimplementedServerServiceServer) GetUser(ServerService_GetUserServer) error {
-	return status.Errorf(codes.Unimplemented, "method GetUser not implemented")
+func (*UnimplementedServerServiceServer) GetUsers(ServerService_GetUsersServer) error {
+	return status.Errorf(codes.Unimplemented, "method GetUsers not implemented")
 }
-func (*UnimplementedServerServiceServer) SetUser(ServerService_SetUserServer) error {
-	return status.Errorf(codes.Unimplemented, "method SetUser not implemented")
+func (*UnimplementedServerServiceServer) SetUsers(ServerService_SetUsersServer) error {
+	return status.Errorf(codes.Unimplemented, "method SetUsers not implemented")
 }
 
 func RegisterServerServiceServer(s *grpc.Server, srv ServerServiceServer) {
@@ -1314,52 +1334,52 @@ func (x *serverServiceListUsersServer) Send(m *ListUsersResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func _ServerService_GetUser_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(ServerServiceServer).GetUser(&serverServiceGetUserServer{stream})
+func _ServerService_GetUsers_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(ServerServiceServer).GetUsers(&serverServiceGetUsersServer{stream})
 }
 
-type ServerService_GetUserServer interface {
-	Send(*GetUserResponse) error
-	Recv() (*GetUserRequest, error)
+type ServerService_GetUsersServer interface {
+	Send(*GetUsersResponse) error
+	Recv() (*GetUsersRequest, error)
 	grpc.ServerStream
 }
 
-type serverServiceGetUserServer struct {
+type serverServiceGetUsersServer struct {
 	grpc.ServerStream
 }
 
-func (x *serverServiceGetUserServer) Send(m *GetUserResponse) error {
+func (x *serverServiceGetUsersServer) Send(m *GetUsersResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *serverServiceGetUserServer) Recv() (*GetUserRequest, error) {
-	m := new(GetUserRequest)
+func (x *serverServiceGetUsersServer) Recv() (*GetUsersRequest, error) {
+	m := new(GetUsersRequest)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func _ServerService_SetUser_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(ServerServiceServer).SetUser(&serverServiceSetUserServer{stream})
+func _ServerService_SetUsers_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(ServerServiceServer).SetUsers(&serverServiceSetUsersServer{stream})
 }
 
-type ServerService_SetUserServer interface {
-	Send(*SetUserResponse) error
-	Recv() (*SetUserRequest, error)
+type ServerService_SetUsersServer interface {
+	Send(*SetUsersResponse) error
+	Recv() (*SetUsersRequest, error)
 	grpc.ServerStream
 }
 
-type serverServiceSetUserServer struct {
+type serverServiceSetUsersServer struct {
 	grpc.ServerStream
 }
 
-func (x *serverServiceSetUserServer) Send(m *SetUserResponse) error {
+func (x *serverServiceSetUsersServer) Send(m *SetUsersResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *serverServiceSetUserServer) Recv() (*SetUserRequest, error) {
-	m := new(SetUserRequest)
+func (x *serverServiceSetUsersServer) Recv() (*SetUsersRequest, error) {
+	m := new(SetUsersRequest)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -1377,14 +1397,14 @@ var _ServerService_serviceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 		{
-			StreamName:    "GetUser",
-			Handler:       _ServerService_GetUser_Handler,
+			StreamName:    "GetUsers",
+			Handler:       _ServerService_GetUsers_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},
 		{
-			StreamName:    "SetUser",
-			Handler:       _ServerService_SetUser_Handler,
+			StreamName:    "SetUsers",
+			Handler:       _ServerService_SetUsers_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},

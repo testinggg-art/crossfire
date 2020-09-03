@@ -29,6 +29,9 @@ type ApiCommand struct {
 	// Target user id
 	user *string
 
+	// If reset traffic when getting user
+	reset *bool
+
 	// Upload speed limit of target user
 	uploadSpeedLimit *int
 
@@ -79,7 +82,9 @@ func (c *ApiCommand) getTraffic(clientModeClient api.ClientServiceClient) error 
 }
 
 func (c *ApiCommand) listUsers(serverModeClient api.ServerServiceClient) error {
-	stream, err := serverModeClient.ListUsers(c.ctx, &api.ListUsersRequest{})
+	stream, err := serverModeClient.ListUsers(c.ctx, &api.ListUsersRequest{
+		Reset_: *c.reset,
+	})
 	if err != nil {
 		return err
 	}
@@ -103,16 +108,18 @@ func (c *ApiCommand) listUsers(serverModeClient api.ServerServiceClient) error {
 	return nil
 }
 
+// Return one user profile, please note the api support getting multi users
 func (c *ApiCommand) getUser(apiClient api.ServerServiceClient) error {
-	stream, err := apiClient.GetUser(c.ctx)
+	stream, err := apiClient.GetUsers(c.ctx)
 	if err != nil {
 		return err
 	}
 	defer stream.CloseSend()
-	err = stream.Send(&api.GetUserRequest{
+	err = stream.Send(&api.GetUsersRequest{
 		User: &api.User{
 			Hash: *c.user,
 		},
+		Reset_: *c.reset,
 	})
 	if err != nil {
 		return err
@@ -129,14 +136,15 @@ func (c *ApiCommand) getUser(apiClient api.ServerServiceClient) error {
 	return nil
 }
 
-func (c *ApiCommand) setUser(apiClient api.ServerServiceClient, operation api.SetUserRequest_Operation) error {
-	stream, err := apiClient.SetUser(c.ctx)
+// Update one user profile, please note the api support setting multi users
+func (c *ApiCommand) setUser(apiClient api.ServerServiceClient, operation api.SetUsersRequest_Operation) error {
+	stream, err := apiClient.SetUsers(c.ctx)
 	if err != nil {
 		return err
 	}
 	defer stream.CloseSend()
 
-	req := &api.SetUserRequest{
+	req := &api.SetUsersRequest{
 		Status: &api.UserStatus{
 			User: &api.User{
 				Hash: *c.user,
@@ -167,9 +175,11 @@ func (c *ApiCommand) setUser(apiClient api.ServerServiceClient, operation api.Se
 }
 
 func (c *ApiCommand) Execute() error {
+	// Return an error tells that user does not input this command
 	if *c.command == "" {
-		return errors.New("") // Return an error tells that user does not input this command
+		return errors.New("")
 	}
+
 	conn, err := grpc.Dial(*c.host, grpc.WithInsecure())
 	if err != nil {
 		log.Print(err)
@@ -186,13 +196,13 @@ func (c *ApiCommand) Execute() error {
 	case "list-users":
 		err = c.listUsers(serverModeClient)
 	case "create-user":
-		err = c.setUser(serverModeClient, api.SetUserRequest_Add)
+		err = c.setUser(serverModeClient, api.SetUsersRequest_Add)
 	case "read-user":
 		err = c.getUser(serverModeClient)
 	case "update-user":
-		err = c.setUser(serverModeClient, api.SetUserRequest_Modify)
+		err = c.setUser(serverModeClient, api.SetUsersRequest_Modify)
 	case "delete-user":
-		err = c.setUser(serverModeClient, api.SetUserRequest_Delete)
+		err = c.setUser(serverModeClient, api.SetUsersRequest_Delete)
 	default:
 		log.Printf("unknown command " + *c.command)
 	}
@@ -207,6 +217,7 @@ func init() {
 		command:            flag.String("api", "", "Connect to CrossFire API service, e.g, -api list-users"),
 		host:               flag.String("host", "127.0.0.1:11081", "Host of CrossFire API service"),
 		user:               flag.String("user", "", "Target user id"),
+		reset:              flag.Bool("reset", false, "If reset traffic when getting user"),
 		uploadSpeedLimit:   flag.Int("upload-speed-limit", 0, "Limit the upload speed with API"),
 		downloadSpeedLimit: flag.Int("download-speed-limit", 0, "Limit the download speed with API"),
 		ipLimit:            flag.Int("ip-limit", 0, "Limit the number of IP with API"),

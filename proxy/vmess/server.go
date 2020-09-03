@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/jarvisgally/crossfire/api"
 	"hash/fnv"
 	"io"
 	"log"
@@ -68,6 +69,11 @@ func NewVmessServer(ctx context.Context, url *url.URL) (proxy.Server, error) {
 	s.users = append(s.users, user.GenAlterIDUsers(int(alterID))...)
 
 	s.authenticator = proxy.NewAuthenticator(ctx, uuidStr)
+	// Run API service
+	apiListenAddr := query.Get("api")
+	if apiListenAddr != "" {
+		go api.RunServerAPI(ctx, s.authenticator, apiListenAddr)
+	}
 
 	s.baseTime = time.Now().UTC().Unix() - cacheDurationSec*2
 	s.userHashes = make(map[[16]byte]*UserAtTime, 1024)
@@ -159,6 +165,17 @@ func (s *Server) Handshake(underlay net.Conn) (io.ReadWriteCloser, *proxy.Target
 	c.meter = meter
 	c.meter.AddTraffic(0, 16)
 	c.recv += uint64(16)
+
+	ip, _, err := net.SplitHostPort(c.Conn.RemoteAddr().String())
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse host %v: %v", c.Conn.RemoteAddr(), err)
+	}
+
+	c.ip = ip
+	ok := meter.AddIP(ip)
+	if !ok {
+		return nil, nil, fmt.Errorf("ip limit reached for user %v", user.Hash)
+	}
 
 	//
 	// 解开指令部分，该部分使用了AES-128-CFB加密
@@ -333,6 +350,7 @@ type ServerConn struct {
 	meter *proxy.Meter
 	sent  uint64
 	recv  uint64
+	ip    string
 }
 
 func (c *ServerConn) Read(b []byte) (int, error) {
@@ -427,5 +445,6 @@ func (c *ServerConn) Write(b []byte) (int, error) {
 
 func (c *ServerConn) Close() error {
 	log.Printf("user %v from %v tunneling to %v closed, sent: %v, recv: %v", c.user.Hash, c.Conn.RemoteAddr(), c.target, common.HumanFriendlyTraffic(c.sent), common.HumanFriendlyTraffic(c.recv))
+	c.meter.DelIP(c.ip)
 	return c.Conn.Close()
 }

@@ -51,9 +51,9 @@ func TestServerAPI(t *testing.T) {
 	time.Sleep(time.Second * 1)
 
 	// GetUser
-	stream2, err := server.GetUser(ctx)
+	stream2, err := server.GetUsers(ctx)
 	common.Must(err)
-	stream2.Send(&GetUserRequest{
+	stream2.Send(&GetUsersRequest{
 		User: &User{
 			Hash: userId,
 		},
@@ -65,14 +65,14 @@ func TestServerAPI(t *testing.T) {
 	}
 
 	// SetUser
-	stream3, err := server.SetUser(ctx)
-	stream3.Send(&SetUserRequest{
+	stream3, err := server.SetUsers(ctx)
+	stream3.Send(&SetUsersRequest{
 		Status: &UserStatus{
 			User: &User{
 				Hash: userId,
 			},
 		},
-		Operation: SetUserRequest_Delete,
+		Operation: SetUsersRequest_Delete,
 	})
 	resp3, err := stream3.Recv()
 	if err != nil || !resp3.Success {
@@ -82,13 +82,13 @@ func TestServerAPI(t *testing.T) {
 	if valid {
 		t.Fatal("failed to auth")
 	}
-	stream3.Send(&SetUserRequest{
+	stream3.Send(&SetUsersRequest{
 		Status: &UserStatus{
 			User: &User{
 				Hash: newUserId,
 			},
 		},
-		Operation: SetUserRequest_Add,
+		Operation: SetUsersRequest_Add,
 	})
 	resp3, err = stream3.Recv()
 	if err != nil || !resp3.Success {
@@ -98,7 +98,7 @@ func TestServerAPI(t *testing.T) {
 	if !valid {
 		t.Fatal("failed to auth 2")
 	}
-	stream3.Send(&SetUserRequest{
+	stream3.Send(&SetUsersRequest{
 		Status: &UserStatus{
 			User: &User{
 				Hash: newUserId,
@@ -112,7 +112,7 @@ func TestServerAPI(t *testing.T) {
 				UploadTraffic:   1,
 			},
 		},
-		Operation: SetUserRequest_Modify,
+		Operation: SetUsersRequest_Modify,
 	})
 	go func() {
 		for {
@@ -136,7 +136,7 @@ func TestServerAPI(t *testing.T) {
 	}()
 	time.Sleep(time.Second * 3)
 	for i := 0; i < 3; i++ {
-		stream2.Send(&GetUserRequest{
+		stream2.Send(&GetUsersRequest{
 			User: &User{
 				Hash: newUserId,
 			},

@@ -3,17 +3,18 @@ package api
 import (
 	"context"
 	"fmt"
-	"github.com/jarvisgally/crossfire/proxy"
-	"google.golang.org/grpc"
 	"log"
 	"net"
+
+	"github.com/jarvisgally/crossfire/proxy"
+	"google.golang.org/grpc"
 )
 
+// API for CrossFire client
 type ClientAPI struct {
 	ClientServiceServer
 
 	meter         *proxy.Meter
-	ctx           context.Context
 	uploadSpeed   uint64
 	downloadSpeed uint64
 	lastSent      uint64
@@ -24,6 +25,7 @@ func (s *ClientAPI) GetTraffic(ctx context.Context, req *GetTrafficRequest) (*Ge
 	log.Print("API: GetTraffic")
 	sent, recv := s.meter.GetTraffic()
 	sentSpeed, recvSpeed := s.meter.GetSpeed()
+	// In client mode, sent -> upload, recv -> download
 	resp := &GetTrafficResponse{
 		Success: true,
 		TrafficTotal: &Traffic{
@@ -42,7 +44,6 @@ func RunClientAPI(ctx context.Context, meter *proxy.Meter, listenAddr string) er
 	server := grpc.NewServer()
 	defer server.Stop()
 	RegisterClientServiceServer(server, &ClientAPI{
-		ctx:   ctx,
 		meter: meter,
 	})
 	listener, err := net.Listen("tcp", listenAddr)

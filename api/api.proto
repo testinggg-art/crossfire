@@ -37,24 +37,25 @@ message GetTrafficResponse {
 }
 
 message ListUsersRequest {
-
+    bool reset = 1;
 }
 
 message ListUsersResponse {
     UserStatus status = 1;
 }
 
-message GetUserRequest {
+message GetUsersRequest {
     User user = 1;
+    bool reset = 2;
 }
 
-message GetUserResponse {
+message GetUsersResponse {
     bool success = 1;
     string info = 2;
     UserStatus status = 3;
 }
 
-message SetUserRequest {
+message SetUsersRequest {
     enum Operation {
         Add = 0;
         Delete = 1;
@@ -64,7 +65,7 @@ message SetUserRequest {
     Operation operation = 2;
 }
 
-message SetUserResponse {
+message SetUsersResponse {
     bool success = 1;
     string info = 2;
 }
@@ -77,7 +78,7 @@ service ServerService {
     // list all users
     rpc ListUsers(ListUsersRequest) returns(stream ListUsersResponse){}
     // obtain specified user's info
-    rpc GetUser(stream GetUserRequest) returns(stream GetUserResponse){}
+    rpc GetUsers(stream GetUsersRequest) returns(stream GetUsersResponse){}
     // setup existing users' config
-    rpc SetUser(stream SetUserRequest) returns(stream SetUserResponse){}
+    rpc SetUsers(stream SetUsersRequest) returns(stream SetUsersResponse){}
 }
