@@ -20,7 +20,7 @@ func TestServerAPI(t *testing.T) {
 	userId := "hash1234"
 	newUserId := "hash4567"
 
-	auth := proxy.NewAuthenticator(ctx)
+	auth := proxy.NewMeterManager(ctx)
 	go RunServerAPI(ctx, auth, addr)
 	time.Sleep(time.Second * 3)
 

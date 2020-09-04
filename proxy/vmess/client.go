@@ -14,7 +14,6 @@ import (
 	"math/rand"
 	"net"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -31,44 +30,23 @@ func init() {
 func NewVmessClient(ctx context.Context, url *url.URL) (proxy.Client, error) {
 	addr := url.Host
 
-	// uuid
 	uuidStr := url.User.Username()
-	user, err := NewUser(uuidStr)
-	if err != nil {
-		return nil, err
-	}
-
-	// alterId
 	alterIDStr, ok := url.User.Password()
 	if !ok {
 		alterIDStr = "4"
 	}
-	alterID, err := strconv.ParseUint(alterIDStr, 10, 32)
+	user, err := NewUser(ctx, uuidStr, alterIDStr)
 	if err != nil {
-		log.Printf("parse alterId err: %v", err)
 		return nil, err
 	}
 
 	query := url.Query()
-
-	// security
 	security := query.Get("security")
 	if security == "" {
 		security = "none"
 	}
 
-	//
-	c := &Client{addr: addr}
-	c.users = append(c.users, user)
-	c.users = append(c.users, user.GenAlterIDUsers(int(alterID))...)
-
-	// Run API service
-	c.meter = proxy.NewMeter(ctx, uuidStr)
-	apiListenAddr := query.Get("api")
-	if apiListenAddr != "" {
-		go api.RunClientAPI(ctx, c.meter, apiListenAddr)
-	}
-
+	c := &Client{addr: addr, user: user}
 	c.opt = OptChunkStream
 	security = strings.ToLower(security)
 	switch security {
@@ -87,18 +65,21 @@ func NewVmessClient(ctx context.Context, url *url.URL) (proxy.Client, error) {
 	}
 	rand.Seed(time.Now().UnixNano())
 
+	// Run API service
+	apiListenAddr := query.Get("api")
+	if apiListenAddr != "" {
+		go api.RunClientAPI(ctx, user, apiListenAddr)
+	}
+
 	return c, nil
 }
 
 // Client is a vmess client
 type Client struct {
 	addr     string
-	users    []*User
+	user     *User
 	opt      byte
 	security byte
-
-	// Provides stats control for client
-	meter *proxy.Meter
 }
 
 func (c *Client) Name() string { return Name }
@@ -106,10 +87,9 @@ func (c *Client) Name() string { return Name }
 func (c *Client) Addr() string { return c.addr }
 
 func (c *Client) Handshake(underlay net.Conn, target string) (io.ReadWriteCloser, error) {
-	r := rand.Intn(len(c.users))
-	conn := &ClientConn{target: target, user: c.users[r], opt: c.opt, security: c.security}
+	r := rand.Intn(len(c.user.UUIDs))
+	conn := &ClientConn{target: target, user: c.user, uuid: c.user.UUIDs[r], opt: c.opt, security: c.security}
 	conn.Conn = underlay
-	conn.meter = c.meter
 	var err error
 	conn.atyp, conn.addr, conn.port, err = ParseAddr(target)
 	if err != nil {
@@ -143,6 +123,7 @@ func (c *Client) Handshake(underlay net.Conn, target string) (io.ReadWriteCloser
 type ClientConn struct {
 	target   string
 	user     *User
+	uuid     [16]byte
 	opt      byte
 	security byte
 
@@ -160,9 +141,8 @@ type ClientConn struct {
 	dataReader io.Reader
 	dataWriter io.Writer
 
-	meter *proxy.Meter
-	sent  uint64
-	recv  uint64
+	sent uint64
+	recv uint64
 }
 
 // Auth send auth info: HMAC("md5", UUID, UTC)
@@ -171,12 +151,11 @@ func (c *ClientConn) Auth() error {
 	defer common.PutBuffer(ts)
 
 	binary.BigEndian.PutUint64(ts, uint64(time.Now().UTC().Unix()))
-
-	h := hmac.New(md5.New, c.user.UUID[:])
+	h := hmac.New(md5.New, c.uuid[:])
 	h.Write(ts)
 
 	n, err := c.Conn.Write(h.Sum(nil))
-	c.meter.AddTraffic(n, 0)
+	c.user.AddTraffic(n, 0)
 	c.sent += uint64(n)
 	return err
 }
@@ -237,7 +216,7 @@ func (c *ClientConn) Request() error {
 	stream.XORKeyStream(buf.Bytes(), buf.Bytes())
 
 	n, err := c.Conn.Write(buf.Bytes())
-	c.meter.AddTraffic(n, 0)
+	c.user.AddTraffic(n, 0)
 	c.sent += uint64(n)
 	return err
 }
@@ -255,7 +234,7 @@ func (c *ClientConn) DecodeRespHeader() error {
 	defer common.PutBuffer(b)
 
 	n, err := io.ReadFull(c.Conn, b)
-	c.meter.AddTraffic(0, n)
+	c.user.AddTraffic(0, n)
 	c.recv += uint64(n)
 	if err != nil {
 		return err
@@ -302,7 +281,7 @@ func (c *ClientConn) Write(b []byte) (int, error) {
 	}
 
 	n, err := c.dataWriter.Write(b)
-	c.meter.AddTraffic(n, 0)
+	c.user.AddTraffic(n, 0)
 	c.sent += uint64(n)
 	return n, err
 }
@@ -338,7 +317,7 @@ func (c *ClientConn) Read(b []byte) (int, error) {
 	}
 
 	n, err := c.dataReader.Read(b)
-	c.meter.AddTraffic(0, n)
+	c.user.AddTraffic(0, n)
 	c.recv += uint64(n)
 	return n, err
 }

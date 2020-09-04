@@ -15,7 +15,7 @@ import (
 // API for CrossFire server
 type ServerAPI struct {
 	ServerServiceServer
-	auth *proxy.Authenticator
+	userManager proxy.UserManager
 }
 
 func (s *ServerAPI) GetUsers(stream ServerService_GetUsersServer) error {
@@ -31,7 +31,7 @@ func (s *ServerAPI) GetUsers(stream ServerService_GetUsersServer) error {
 		if req.User == nil {
 			return errors.New("user is unspecified")
 		}
-		valid, user := s.auth.AuthUser(req.User.Hash)
+		valid, user := s.userManager.AuthUser(req.User.Hash)
 		if !valid {
 			stream.Send(&GetUsersResponse{
 				Success: false,
@@ -91,12 +91,12 @@ func (s *ServerAPI) SetUsers(stream ServerService_SetUsersServer) error {
 		}
 		switch req.Operation {
 		case SetUsersRequest_Add:
-			if err = s.auth.AddUser(req.Status.User.Hash); err != nil {
+			if err = s.userManager.AddUser(req.Status.User.Hash); err != nil {
 				err = fmt.Errorf("failed to add new user: %w", err)
 				break
 			}
 			if req.Status.SpeedLimit != nil {
-				valid, user := s.auth.AuthUser(req.Status.User.Hash)
+				valid, user := s.userManager.AuthUser(req.Status.User.Hash)
 				if !valid {
 					err = fmt.Errorf("failed to auth new user: %w", err)
 					continue
@@ -110,9 +110,9 @@ func (s *ServerAPI) SetUsers(stream ServerService_SetUsersServer) error {
 				user.SetIPLimit(int(req.Status.IpLimit))
 			}
 		case SetUsersRequest_Delete:
-			err = s.auth.DelUser(req.Status.User.Hash)
+			err = s.userManager.DelUser(req.Status.User.Hash)
 		case SetUsersRequest_Modify:
-			valid, user := s.auth.AuthUser(req.Status.User.Hash)
+			valid, user := s.userManager.AuthUser(req.Status.User.Hash)
 			if !valid {
 				err = fmt.Errorf("invalid user: %v", req.Status.User.Hash)
 			} else {
@@ -140,7 +140,7 @@ func (s *ServerAPI) SetUsers(stream ServerService_SetUsersServer) error {
 
 func (s *ServerAPI) ListUsers(req *ListUsersRequest, stream ServerService_ListUsersServer) error {
 	log.Print("API: ListUsers")
-	users := s.auth.ListUsers()
+	users := s.userManager.ListUsers()
 	for _, user := range users {
 		var downloadTraffic, uploadTraffic uint64
 		if req.Reset_ {
@@ -180,11 +180,11 @@ func (s *ServerAPI) ListUsers(req *ListUsersRequest, stream ServerService_ListUs
 	return nil
 }
 
-func RunServerAPI(ctx context.Context, auth *proxy.Authenticator, listenAddr string) error {
+func RunServerAPI(ctx context.Context, um proxy.UserManager, listenAddr string) error {
 	server := grpc.NewServer()
 	defer server.Stop()
 	RegisterServerServiceServer(server, &ServerAPI{
-		auth: auth,
+		userManager: um,
 	})
 	listener, err := net.Listen("tcp", listenAddr)
 	if err != nil {

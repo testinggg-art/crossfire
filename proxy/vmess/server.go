@@ -4,30 +4,21 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/hmac"
 	"crypto/md5"
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/jarvisgally/crossfire/api"
 	"hash/fnv"
 	"io"
 	"log"
 	"net"
 	"net/url"
-	"strconv"
-	"sync"
 	"time"
 
+	"github.com/jarvisgally/crossfire/api"
 	"github.com/jarvisgally/crossfire/common"
 	"github.com/jarvisgally/crossfire/proxy"
 	"golang.org/x/crypto/chacha20poly1305"
-)
-
-const (
-	updateInterval   = 30 * time.Second
-	cacheDurationSec = 120
-	sessionTimeOut   = 3 * time.Minute
 )
 
 func init() {
@@ -37,89 +28,31 @@ func init() {
 func NewVmessServer(ctx context.Context, url *url.URL) (proxy.Server, error) {
 	addr := url.Host
 
-	// uuid
 	uuidStr := url.User.Username()
-	user, err := NewUser(uuidStr)
-	if err != nil {
-		return nil, err
-	}
-
-	// alterId
 	alterIDStr, ok := url.User.Password()
 	if !ok {
 		alterIDStr = "4"
 	}
-	alterID, err := strconv.ParseUint(alterIDStr, 10, 32)
-	if err != nil {
-		log.Printf("parse alterId err: %v", err)
-		return nil, err
-	}
 
 	query := url.Query()
 
-	// security
-	security := query.Get("security")
-	if security == "" {
-		security = "none"
-	}
-
-	//
 	s := &Server{addr: addr}
-	s.users = append(s.users, user)
-	s.users = append(s.users, user.GenAlterIDUsers(int(alterID))...)
+	s.userManager = NewUserManager(ctx, uuidStr, alterIDStr)
 
-	s.authenticator = proxy.NewAuthenticator(ctx, uuidStr)
 	// Run API service
 	apiListenAddr := query.Get("api")
 	if apiListenAddr != "" {
-		go api.RunServerAPI(ctx, s.authenticator, apiListenAddr)
+		go api.RunServerAPI(ctx, s.userManager, apiListenAddr)
 	}
-
-	s.baseTime = time.Now().UTC().Unix() - cacheDurationSec*2
-	s.userHashes = make(map[[16]byte]*UserAtTime, 1024)
-	s.sessionHistory = make(map[SessionId]time.Time, 128)
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.After(updateInterval):
-				s.Refresh()
-			}
-		}
-	}()
-	s.Refresh()
 
 	return s, nil
 }
 
-type UserAtTime struct {
-	user    *User
-	timeInc int64
-	tainted bool // 是否被重放攻击污染
-}
-
-type SessionId struct {
-	user  [16]byte
-	key   [16]byte
-	nonce [16]byte
-}
-
 type Server struct {
-	addr  string
-	users []*User
-
-	// userHashes用于校验VMess请求的认证信息部分
-	// sessionHistory保存一段时间内的请求用来检测重放攻击
-	baseTime       int64
-	userHashes     map[[16]byte]*UserAtTime
-	sessionHistory map[SessionId]time.Time
-
-	// 定时刷新userHashes和sessionHistory
-	mux4Hashes, mux4Sessions sync.RWMutex
+	addr string
 
 	// Provides user/stats control for client
-	authenticator *proxy.Authenticator
+	userManager *UserManager
 }
 
 func (s *Server) Name() string { return Name }
@@ -145,25 +78,13 @@ func (s *Server) Handshake(underlay net.Conn) (io.ReadWriteCloser, *proxy.Target
 	if err != nil {
 		return nil, nil, err
 	}
-	var user *User
-	var timestamp int64
-	s.mux4Hashes.RLock()
-	uat, found := s.userHashes[auth]
-	if !found || uat.tainted {
-		s.mux4Hashes.RUnlock()
-		return nil, nil, errors.New("invalid user or tainted")
-	}
-	user = uat.user
-	timestamp = uat.timeInc + s.baseTime
-	s.mux4Hashes.RUnlock()
-	c.user = user
 
-	valid, meter := s.authenticator.AuthUser(user.Hash)
-	if !valid {
-		return nil, nil, fmt.Errorf("invalid user hash %v", user.Hash)
+	user, timestamp, err := s.userManager.CheckAuth(auth)
+	if err != nil {
+		return nil, nil, err
 	}
-	c.meter = meter
-	c.meter.AddTraffic(0, 16)
+	c.user = user
+	c.user.AddTraffic(0, 16)
 	c.recv += uint64(16)
 
 	ip, _, err := net.SplitHostPort(c.Conn.RemoteAddr().String())
@@ -172,9 +93,9 @@ func (s *Server) Handshake(underlay net.Conn) (io.ReadWriteCloser, *proxy.Target
 	}
 
 	c.ip = ip
-	ok := meter.AddIP(ip)
+	ok := user.AddIP(ip)
 	if !ok {
-		return nil, nil, fmt.Errorf("ip limit reached for user %v", user.Hash)
+		return nil, nil, fmt.Errorf("ip limit reached for user %v", user.Hash())
 	}
 
 	//
@@ -196,7 +117,7 @@ func (s *Server) Handshake(underlay net.Conn) (io.ReadWriteCloser, *proxy.Target
 	if err != nil {
 		return nil, nil, err
 	}
-	c.meter.AddTraffic(0, n)
+	c.user.AddTraffic(0, n)
 	c.recv += uint64(n)
 	stream.XORKeyStream(req, req)
 	fullReq.Write(req)
@@ -204,18 +125,10 @@ func (s *Server) Handshake(underlay net.Conn) (io.ReadWriteCloser, *proxy.Target
 	copy(c.reqBodyIV[:], req[1:17])   // 16 bytes, 数据加密 IV
 	copy(c.reqBodyKey[:], req[17:33]) // 16 bytes, 数据加密 Key
 
-	var sid SessionId
-	copy(sid.user[:], user.UUID[:])
-	sid.key = c.reqBodyKey
-	sid.nonce = c.reqBodyIV
-	s.mux4Sessions.Lock()
-	now := time.Now().UTC()
-	if expire, found := s.sessionHistory[sid]; found && expire.After(now) {
-		s.mux4Sessions.Unlock()
-		return nil, nil, errors.New("duplicated session id")
+	_, err = s.userManager.CheckSession(auth, user.UUID, c.reqBodyKey, c.reqBodyIV)
+	if err != nil {
+		return nil, nil, err
 	}
-	s.sessionHistory[sid] = now.Add(sessionTimeOut)
-	s.mux4Sessions.Unlock()
 
 	c.reqRespV = req[33]           // 1 byte, 直接用于响应的认证
 	c.opt = req[34]                // 1 byte
@@ -242,7 +155,7 @@ func (s *Server) Handshake(underlay net.Conn) (io.ReadWriteCloser, *proxy.Target
 		if err != nil {
 			return nil, nil, err
 		}
-		c.meter.AddTraffic(0, n)
+		c.user.AddTraffic(0, n)
 		c.recv += uint64(n)
 		stream.XORKeyStream(reqLength, reqLength)
 		fullReq.Write(reqLength)
@@ -260,7 +173,7 @@ func (s *Server) Handshake(underlay net.Conn) (io.ReadWriteCloser, *proxy.Target
 	if err != nil {
 		return nil, nil, err
 	}
-	c.meter.AddTraffic(0, n)
+	c.user.AddTraffic(0, n)
 	c.recv += uint64(n)
 	stream.XORKeyStream(reqRemaining, reqRemaining)
 	fullReq.Write(reqRemaining)
@@ -289,47 +202,6 @@ func (s *Server) Handshake(underlay net.Conn) (io.ReadWriteCloser, *proxy.Target
 	return c, addr, nil
 }
 
-func (s *Server) Refresh() {
-	s.mux4Hashes.Lock()
-	now := time.Now().UTC()
-	nowSec := now.Unix()
-	genBeginSec := nowSec - cacheDurationSec
-	genEndSec := nowSec + cacheDurationSec
-	var hashValue [16]byte
-	for _, user := range s.users {
-		hasher := hmac.New(md5.New, user.UUID[:])
-		for ts := genBeginSec; ts <= genEndSec; ts++ {
-			var b [8]byte
-			binary.BigEndian.PutUint64(b[:], uint64(ts))
-			hasher.Write(b[:])
-			hasher.Sum(hashValue[:0])
-			hasher.Reset()
-
-			s.userHashes[hashValue] = &UserAtTime{
-				user:    user,
-				timeInc: ts - s.baseTime,
-				tainted: false,
-			}
-		}
-	}
-	if genBeginSec > s.baseTime {
-		for k, v := range s.userHashes {
-			if v.timeInc+s.baseTime < genBeginSec {
-				delete(s.userHashes, k)
-			}
-		}
-	}
-	s.mux4Hashes.Unlock()
-
-	s.mux4Sessions.Lock()
-	for session, expire := range s.sessionHistory {
-		if expire.Before(now) {
-			delete(s.sessionHistory, session)
-		}
-	}
-	s.mux4Sessions.Unlock()
-}
-
 // ServerConn wrapper a net.Conn with vmess protocol
 type ServerConn struct {
 	net.Conn
@@ -347,7 +219,6 @@ type ServerConn struct {
 	respBodyIV  [16]byte
 	respBodyKey [16]byte
 
-	meter *proxy.Meter
 	sent  uint64
 	recv  uint64
 	ip    string
@@ -381,7 +252,7 @@ func (c *ServerConn) Read(b []byte) (int, error) {
 	}
 
 	n, err := c.dataReader.Read(b)
-	c.meter.AddTraffic(0, n)
+	c.user.AddTraffic(0, n)
 	c.recv += uint64(n)
 	return n, err
 }
@@ -438,13 +309,13 @@ func (c *ServerConn) Write(b []byte) (int, error) {
 	}
 
 	n, err := c.dataWriter.Write(b)
-	c.meter.AddTraffic(n, 0)
+	c.user.AddTraffic(n, 0)
 	c.sent += uint64(n)
 	return n, err
 }
 
 func (c *ServerConn) Close() error {
-	log.Printf("user %v from %v tunneling to %v closed, sent: %v, recv: %v", c.user.Hash, c.Conn.RemoteAddr(), c.target, common.HumanFriendlyTraffic(c.sent), common.HumanFriendlyTraffic(c.recv))
-	c.meter.DelIP(c.ip)
+	log.Printf("user %v from %v tunneling to %v closed, sent: %v, recv: %v", c.user.Hash(), c.Conn.RemoteAddr(), c.target, common.HumanFriendlyTraffic(c.sent), common.HumanFriendlyTraffic(c.recv))
+	c.user.DelIP(c.ip)
 	return c.Conn.Close()
 }

@@ -14,7 +14,7 @@ import (
 type ClientAPI struct {
 	ClientServiceServer
 
-	meter         *proxy.Meter
+	user          proxy.User
 	uploadSpeed   uint64
 	downloadSpeed uint64
 	lastSent      uint64
@@ -23,8 +23,8 @@ type ClientAPI struct {
 
 func (s *ClientAPI) GetTraffic(ctx context.Context, req *GetTrafficRequest) (*GetTrafficResponse, error) {
 	log.Print("API: GetTraffic")
-	sent, recv := s.meter.GetTraffic()
-	sentSpeed, recvSpeed := s.meter.GetSpeed()
+	sent, recv := s.user.GetTraffic()
+	sentSpeed, recvSpeed := s.user.GetSpeed()
 	// In client mode, sent -> upload, recv -> download
 	resp := &GetTrafficResponse{
 		Success: true,
@@ -40,11 +40,11 @@ func (s *ClientAPI) GetTraffic(ctx context.Context, req *GetTrafficRequest) (*Ge
 	return resp, nil
 }
 
-func RunClientAPI(ctx context.Context, meter *proxy.Meter, listenAddr string) error {
+func RunClientAPI(ctx context.Context, u proxy.User, listenAddr string) error {
 	server := grpc.NewServer()
 	defer server.Stop()
 	RegisterClientServiceServer(server, &ClientAPI{
-		meter: meter,
+		user: u,
 	})
 	listener, err := net.Listen("tcp", listenAddr)
 	if err != nil {

@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -9,6 +10,27 @@ import (
 	"golang.org/x/time/rate"
 )
 
+type User interface {
+	Hash() string
+
+	GetIP() int
+	GetIPLimit() int
+	SetIPLimit(n int)
+	AddIP(ip string) bool
+	DelIP(ip string) bool
+
+	GetTraffic() (uint64, uint64)
+	SetTraffic(send, recv uint64)
+	ResetTraffic()
+	AddTraffic(sent, recv int)
+	GetAndResetTraffic() (uint64, uint64)
+
+	GetSpeed() (uint64, uint64)
+	SetSpeedLimit(send, recv int)
+	GetSpeedLimit() (send, recv int)
+}
+
+// A simple User implementation
 type Meter struct {
 	hash string // Identification of a user
 
@@ -167,14 +189,93 @@ func (u *Meter) GetSpeed() (uint64, uint64) {
 }
 
 // Create Meter from user id
-func NewMeter(ctx context.Context, userId string) *Meter {
+func NewMeter(ctx context.Context, hash string) *Meter {
 	ctx, cancel := context.WithCancel(ctx)
 	meter := &Meter{
-		hash:    userId,
+		hash:    hash,
 		ctx:     ctx,
 		cancel:  cancel,
 		ipTable: make(map[string]struct{}),
 	}
 	go meter.speedUpdater()
 	return meter
+}
+
+type UserManager interface {
+	ListUsers() []User
+	AuthUser(hash string) (bool, User)
+	AddUser(hash string, more ...string) error
+	DelUser(hash string) error
+}
+
+// A simple UserManager implementation for Meter
+type MeterManager struct {
+	sync.RWMutex
+
+	users map[string]*Meter
+	ctx   context.Context
+}
+
+func (a *MeterManager) AuthUser(hash string) (bool, User) {
+	a.RLock()
+	defer a.RUnlock()
+	if user, found := a.users[hash]; found {
+		return true, user
+	}
+	return false, nil
+}
+
+func (a *MeterManager) AddUser(hash string, more ...string) error {
+	a.Lock()
+	defer a.Unlock()
+	if _, found := a.users[hash]; found {
+		return fmt.Errorf("hash %v already exists", hash)
+	}
+	ctx, cancel := context.WithCancel(a.ctx)
+	meter := &Meter{
+		hash:    hash,
+		ctx:     ctx,
+		cancel:  cancel,
+		ipTable: make(map[string]struct{}),
+	}
+	go meter.speedUpdater()
+	a.users[hash] = meter
+	return nil
+}
+
+func (a *MeterManager) DelUser(hash string) error {
+	a.Lock()
+	defer a.Unlock()
+	meter, found := a.users[hash]
+	if !found {
+		return fmt.Errorf("hash %v not found", hash)
+	}
+	meter.Close()
+	delete(a.users, hash)
+	return nil
+}
+
+func (a *MeterManager) ListUsers() []User {
+	a.RLock()
+	defer a.RUnlock()
+	result := make([]User, len(a.users))
+	i := 0
+	for _, u := range a.users {
+		result[i] = u
+		i++
+	}
+	return result
+}
+
+// Create Authenticator from user ids
+func NewMeterManager(ctx context.Context, hashes ...string) *MeterManager {
+	au := &MeterManager{
+		ctx:   ctx,
+		users: make(map[string]*Meter),
+	}
+	// TODO: Load other users from local database
+	for _, hash := range hashes {
+		au.AddUser(hash)
+	}
+	return au
 }
