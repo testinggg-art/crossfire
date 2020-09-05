@@ -14,6 +14,7 @@ import (
 
 func init() {
 	proxy.RegisterServer("vmesss", NewTlsServer)
+	proxy.RegisterServer("trojans", NewTlsServer)
 }
 
 func NewTlsServer(ctx context.Context, url *url.URL) (proxy.Server, error) {

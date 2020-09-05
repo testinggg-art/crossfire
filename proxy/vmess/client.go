@@ -88,8 +88,7 @@ func (c *Client) Addr() string { return c.addr }
 
 func (c *Client) Handshake(underlay net.Conn, target string) (io.ReadWriteCloser, error) {
 	r := rand.Intn(len(c.user.UUIDs))
-	conn := &ClientConn{target: target, user: c.user, uuid: c.user.UUIDs[r], opt: c.opt, security: c.security}
-	conn.Conn = underlay
+	conn := &ClientConn{Conn: underlay, target: target, user: c.user, uuid: c.user.UUIDs[r], opt: c.opt, security: c.security}
 	var err error
 	conn.atyp, conn.addr, conn.port, err = ParseAddr(target)
 	if err != nil {

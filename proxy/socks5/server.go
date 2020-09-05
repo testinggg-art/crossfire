@@ -78,6 +78,7 @@ func (s *Server) Handshake(underlay net.Conn) (io.ReadWriteCloser, *proxy.Target
 	if cmd != CmdConnect {
 		return nil, nil, fmt.Errorf("unsuppoted command %v", cmd)
 	}
+
 	addr := &proxy.TargetAddr{}
 	l := 2
 	off := 4
@@ -90,7 +91,7 @@ func (s *Server) Handshake(underlay net.Conn) (io.ReadWriteCloser, *proxy.Target
 		addr.IP = make(net.IP, net.IPv6len)
 	case ATypDomain:
 		l += int(buf[4])
-		off = 5
+		off += 1
 	default:
 		return nil, nil, fmt.Errorf("unknown address type %v", buf[3])
 	}

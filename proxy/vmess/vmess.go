@@ -38,7 +38,7 @@ const (
 	AtypIP6    byte = 3
 )
 
-// ParseAddr parses the address in string s
+// ParseAddr parses the address in string
 func ParseAddr(s string) (byte, []byte, uint16, error) {
 	var atyp byte
 	var addr []byte

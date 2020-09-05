@@ -24,6 +24,7 @@ import (
 	_ "github.com/jarvisgally/crossfire/proxy/direct"
 	_ "github.com/jarvisgally/crossfire/proxy/socks5"
 	_ "github.com/jarvisgally/crossfire/proxy/tls"
+	_ "github.com/jarvisgally/crossfire/proxy/trojan"
 	_ "github.com/jarvisgally/crossfire/proxy/vmess"
 
 	"github.com/jarvisgally/crossfire/control"

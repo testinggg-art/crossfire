@@ -13,6 +13,7 @@ import (
 
 func init() {
 	proxy.RegisterClient("vmesss", NewTlsClient)
+	proxy.RegisterClient("trojans", NewTlsClient)
 }
 
 func NewTlsClient(ctx context.Context, url *url.URL) (proxy.Client, error) {

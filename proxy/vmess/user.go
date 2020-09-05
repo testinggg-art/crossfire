@@ -279,8 +279,10 @@ func NewUserManager(ctx context.Context, uuidStr, alterId string) *UserManager {
 		ctx:            ctx,
 	}
 	um.AddUser(uuidStr, alterId)
-	// um.doRefresh()
-	// TODO: Load other users from local file or database
+	um.doRefresh()
 	go um.Refresh()
+
+	// TODO: Load other users from local file or database
+
 	return um
 }
