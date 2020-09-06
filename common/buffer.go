@@ -1,24 +1,19 @@
 package common
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
+	"io"
 	"math/bits"
 	"sync"
 )
-
-func init() {
-	bufPools = InitBufPools()
-	writeBufPool = InitWriteBufPool()
-}
 
 //
 // Read buffer
 //
 
-var bufPools []sync.Pool
-
-func InitBufPools() []sync.Pool {
+var bufPools = func() []sync.Pool {
 	pools := make([]sync.Pool, 17) // 1B -> 64K
 	for k := range pools {
 		i := k
@@ -27,7 +22,7 @@ func InitBufPools() []sync.Pool {
 		}
 	}
 	return pools
-}
+}()
 
 func msb(size int) uint16 {
 	return uint16(bits.Len32(uint32(size)) - 1)
@@ -57,12 +52,8 @@ func PutBuffer(buf []byte) error {
 // Write buffer
 //
 
-var writeBufPool sync.Pool
-
-func InitWriteBufPool() sync.Pool {
-	return sync.Pool{
-		New: func() interface{} { return &bytes.Buffer{} },
-	}
+var writeBufPool = sync.Pool{
+	New: func() interface{} { return &bytes.Buffer{} },
 }
 
 func GetWriteBuffer() *bytes.Buffer {
@@ -72,4 +63,25 @@ func GetWriteBuffer() *bytes.Buffer {
 func PutWriteBuffer(buf *bytes.Buffer) {
 	buf.Reset()
 	writeBufPool.Put(buf)
+}
+
+//
+// bufio.Reader pool
+//
+
+var bufioReaderPool = sync.Pool{
+	New: func() interface{} {
+		return bufio.NewReader(nil)
+	},
+}
+
+func GetBufioReader(r io.Reader) *bufio.Reader {
+	reader := bufioReaderPool.Get().(*bufio.Reader)
+	reader.Reset(r)
+	return reader
+}
+
+func PutBufioReader(r *bufio.Reader) {
+	r.Reset(nil)
+	bufioReaderPool.Put(r)
 }

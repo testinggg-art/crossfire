@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/jarvisgally/crossfire/common"
-	_ "github.com/jarvisgally/crossfire/common"
 
 	"github.com/jarvisgally/crossfire/proxy"
 	"github.com/jarvisgally/crossfire/proxy/direct"

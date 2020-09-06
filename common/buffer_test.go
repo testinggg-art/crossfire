@@ -7,8 +7,6 @@ import (
 )
 
 func TestBuffer(t *testing.T) {
-	bufPools = InitBufPools()
-
 	assert.Nil(t, GetBuffer(0))
 	assert.Equal(t, 1, len(GetBuffer(1)))
 	assert.Equal(t, 2, len(GetBuffer(2)))

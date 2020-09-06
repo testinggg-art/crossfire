@@ -3,12 +3,14 @@ package tls
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"net"
 	"testing"
 
+	"github.com/jarvisgally/crossfire/common"
 	"github.com/jarvisgally/crossfire/proxy"
 	_ "github.com/jarvisgally/crossfire/proxy/vmess"
 )
@@ -74,7 +76,9 @@ func TestTls(t *testing.T) {
 	ioutil.WriteFile("server.crt", []byte(cert), 0777)
 	ioutil.WriteFile("server.key", []byte(key), 0777)
 
-	url := "vmesss://a684455c-b14f-11ea-bf0d-42010aaa0003:4@localhost:9527?cert=server.crt&key=server.key"
+	port := common.PickPort("tcp", "127.0.0.1")
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	url := "vmesss://a684455c-b14f-11ea-bf0d-42010aaa0003:4@" + addr + "?cert=server.crt&key=server.key"
 	server, err := proxy.ServerFromURL(ctx, url)
 	if err != nil {
 		return

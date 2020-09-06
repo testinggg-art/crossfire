@@ -3,6 +3,8 @@ package vmess
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"github.com/jarvisgally/crossfire/common"
 	"io"
 	"log"
 	"net"
@@ -15,7 +17,9 @@ func TestVMess(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	url := "vmess://a684455c-b14f-11ea-bf0d-42010aaa0003:4@127.0.0.1:9527"
+	port := common.PickPort("tcp", "127.0.0.1")
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	url := "vmess://a684455c-b14f-11ea-bf0d-42010aaa0003:4@" + addr
 	server, err := proxy.ServerFromURL(ctx, url)
 	if err != nil {
 		return

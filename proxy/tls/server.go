@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/jarvisgally/crossfire/common"
 	"github.com/jarvisgally/crossfire/proxy"
 )
 
@@ -63,12 +64,19 @@ func (s *Server) Name() string { return s.name }
 func (s *Server) Addr() string { return s.addr }
 
 func (s *Server) Handshake(underlay net.Conn) (io.ReadWriteCloser, *proxy.TargetAddr, error) {
-	ss := stdtls.Server(underlay, s.tlsConfig)
-	err := ss.Handshake()
+	tlsConn := stdtls.Server(underlay, s.tlsConfig)
+	err := tlsConn.Handshake()
 	if err != nil {
 		return nil, nil, errors.New("invalid handshake")
 	}
-	// TODO: Check if a http request, redirect to fallback address
-	return s.inner.Handshake(ss)
-}
 
+	sniffConn := common.NewSniffConn(tlsConn)
+	t := sniffConn.Sniff()
+	if t == common.TypeUnknown {
+		// this is not a http request, route to next protocol
+		return s.inner.Handshake(sniffConn)
+	} else {
+		// this is a http request
+		return nil, nil, errors.New("not supported")
+	}
+}

@@ -3,6 +3,8 @@ package trojan
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"github.com/jarvisgally/crossfire/common"
 	"io"
 	"log"
 	"net"
@@ -15,7 +17,9 @@ func TestTrojan(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	url := "trojan://a684455c-b14f-11ea-bf0d-42010aaa0003@127.0.0.1:9527"
+	port := common.PickPort("tcp", "127.0.0.1")
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	url := "trojan://a684455c-b14f-11ea-bf0d-42010aaa0003@" + addr
 	server, err := proxy.ServerFromURL(ctx, url)
 	if err != nil {
 		return
