@@ -1,0 +1,2 @@
+// Server mode
+package web

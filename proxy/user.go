@@ -11,6 +11,8 @@ import (
 )
 
 type User interface {
+	// 返回用户的标识，一般是明文的，e.g, uuid
+	// 如果协议传输过程中需要对用户标识做加密，比如trojan协议对用户标识做了sha224散列，服务端就需要使用散列值来匹配用户，此时就需要给协议实现自定义User和UserManager
 	Hash() string
 
 	GetIP() int
@@ -273,9 +275,11 @@ func NewMeterManager(ctx context.Context, hashes ...string) *MeterManager {
 		ctx:   ctx,
 		users: make(map[string]*Meter),
 	}
-	// TODO: Load other users from local database
 	for _, hash := range hashes {
 		au.AddUser(hash)
 	}
+
+	// TODO: Load other users from local database
+
 	return au
 }

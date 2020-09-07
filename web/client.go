@@ -1,0 +1,2 @@
+// Client mode
+package web

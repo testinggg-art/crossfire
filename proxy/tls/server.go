@@ -4,7 +4,9 @@ import (
 	"context"
 	stdtls "crypto/tls"
 	"errors"
+	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/url"
 	"strings"
@@ -30,14 +32,15 @@ func NewTlsServer(ctx context.Context, url *url.URL) (proxy.Server, error) {
 		return nil, err
 	}
 	fallback := query.Get("fallback")
+	var fallbackAddr *proxy.TargetAddr
 	if fallback != "" {
-		_, _, err = net.SplitHostPort(fallback)
+		fallbackAddr, err = proxy.NewTargetAddr(fallback)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("invalid fallback %v", fallbackAddr)
 		}
 	}
 
-	s := &Server{name: url.Scheme, addr: addr, fallback: fallback}
+	s := &Server{name: url.Scheme, addr: addr, fallbackAddr: fallbackAddr}
 	s.tlsConfig = &stdtls.Config{
 		InsecureSkipVerify: false,
 		ServerName:         sni,
@@ -51,10 +54,10 @@ func NewTlsServer(ctx context.Context, url *url.URL) (proxy.Server, error) {
 }
 
 type Server struct {
-	name      string
-	addr      string
-	fallback  string
-	tlsConfig *stdtls.Config
+	name         string
+	addr         string
+	fallbackAddr *proxy.TargetAddr
+	tlsConfig    *stdtls.Config
 
 	inner proxy.Server
 }
@@ -73,10 +76,15 @@ func (s *Server) Handshake(underlay net.Conn) (io.ReadWriteCloser, *proxy.Target
 	sniffConn := common.NewSniffConn(tlsConn)
 	t := sniffConn.Sniff()
 	if t == common.TypeUnknown {
-		// this is not a http request, route to next protocol
+		// this is not a http request, route to inner protocol, e.g, vmess/trojan
 		return s.inner.Handshake(sniffConn)
 	} else {
-		// this is a http request
-		return nil, nil, errors.New("not supported")
+		// http request, route to fallback address
+		if s.fallbackAddr != nil {
+			log.Printf("http request, redirect to %v", s.fallbackAddr)
+			return sniffConn, s.fallbackAddr, nil
+		} else {
+			return nil, nil, errors.New("not supported")
+		}
 	}
 }
