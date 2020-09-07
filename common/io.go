@@ -57,6 +57,8 @@ func (c *SniffConn) Sniff() int {
 		return TypeHttp
 	}
 
+	// TODO: May need to check more stream types
+
 	return TypeUnknown
 }
 

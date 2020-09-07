@@ -2,7 +2,6 @@ package trojan
 
 import (
 	"context"
-	"github.com/jarvisgally/crossfire/proxy/socks5"
 	"io"
 	"log"
 	"net"
@@ -11,6 +10,7 @@ import (
 	"github.com/jarvisgally/crossfire/api"
 	"github.com/jarvisgally/crossfire/common"
 	"github.com/jarvisgally/crossfire/proxy"
+	"github.com/jarvisgally/crossfire/proxy/socks5"
 )
 
 func init() {
@@ -19,7 +19,7 @@ func init() {
 
 func NewTrojanClient(ctx context.Context, url *url.URL) (proxy.Client, error) {
 	addr := url.Host
-	user := proxy.NewMeter(ctx, SHA224String(url.User.Username()))
+	user := NewUser(ctx, url.User.Username())
 	query := url.Query()
 
 	// Create client
@@ -36,7 +36,7 @@ func NewTrojanClient(ctx context.Context, url *url.URL) (proxy.Client, error) {
 // Client is a vmess client
 type Client struct {
 	addr string
-	user *proxy.Meter
+	user *User
 }
 
 func (c *Client) Name() string { return Name }
@@ -57,7 +57,7 @@ func (c *Client) Handshake(underlay net.Conn, target string) (io.ReadWriteCloser
 
 type ClientConn struct {
 	target string
-	user   *proxy.Meter
+	user   *User
 
 	net.Conn
 	sent uint64
@@ -70,7 +70,7 @@ func (c *ClientConn) Request() error {
 	buf := common.GetWriteBuffer()
 	defer common.PutWriteBuffer(buf)
 
-	buf.Write([]byte(c.user.Hash()))
+	buf.Write([]byte(c.user.Hex))
 	buf.Write(crlf)
 	buf.WriteByte(socks5.CmdConnect)
 	buf.Write(socks5.ParseAddr(c.target))

@@ -22,7 +22,7 @@ func init() {
 
 func NewTrojanServer(ctx context.Context, url *url.URL) (proxy.Server, error) {
 	addr := url.Host
-	userManager := proxy.NewMeterManager(ctx, SHA224String(url.User.Username()))
+	userManager := NewUserManager(ctx, url.User.Username())
 	query := url.Query()
 
 	s := &Server{addr: addr, userManager: userManager}
@@ -40,7 +40,7 @@ type Server struct {
 	addr string
 
 	// Provides user/stats control for client
-	userManager *proxy.MeterManager
+	userManager *UserManager
 }
 
 func (s *Server) Name() string { return Name }
@@ -59,17 +59,17 @@ func (s *Server) Handshake(underlay net.Conn) (io.ReadWriteCloser, *proxy.Target
 	rn := 0
 
 	// Auth
-	reqHash := common.GetBuffer(56)
-	defer common.PutBuffer(reqHash)
-	_, err := io.ReadFull(c.Conn, reqHash[:])
+	reqHex := common.GetBuffer(56)
+	defer common.PutBuffer(reqHex)
+	_, err := io.ReadFull(c.Conn, reqHex[:])
 	if err != nil {
-		return nil, nil, errors.New("failed to read hash")
+		return nil, nil, errors.New("failed to read hex")
 	}
 	rn += 56
-	hash := string(reqHash[:])
-	valid, user := s.userManager.AuthUser(hash)
-	if !valid {
-		return nil, nil, fmt.Errorf("invalid user %v: ", hash)
+	hex := string(reqHex[:])
+	user, err := s.userManager.CheckHex(hex)
+	if err != nil {
+		return nil, nil, err
 	}
 	c.user = user
 
