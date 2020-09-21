@@ -6,7 +6,7 @@ import (
 	"log"
 	"net"
 
-	"github.com/jarvisgally/crossfire/proxy"
+	"github.com/jarvisgally/crossfire/user"
 	"google.golang.org/grpc"
 )
 
@@ -14,7 +14,7 @@ import (
 type ClientAPI struct {
 	ClientServiceServer
 
-	user          proxy.User
+	user          user.User
 	uploadSpeed   uint64
 	downloadSpeed uint64
 	lastSent      uint64
@@ -40,7 +40,7 @@ func (s *ClientAPI) GetTraffic(ctx context.Context, req *GetTrafficRequest) (*Ge
 	return resp, nil
 }
 
-func RunClientAPI(ctx context.Context, u proxy.User, listenAddr string) error {
+func RunClientAPI(ctx context.Context, u user.User, listenAddr string) error {
 	server := grpc.NewServer()
 	defer server.Stop()
 	RegisterClientServiceServer(server, &ClientAPI{

@@ -2,18 +2,18 @@ package trojan
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/jarvisgally/crossfire/api"
-	"github.com/jarvisgally/crossfire/common"
-	"github.com/jarvisgally/crossfire/proxy"
-	"github.com/jarvisgally/crossfire/proxy/socks5"
 	"io"
 	"log"
 	"net"
 	"net/url"
 	"time"
+
+	"github.com/jarvisgally/crossfire/api"
+	"github.com/jarvisgally/crossfire/common"
+	"github.com/jarvisgally/crossfire/proxy"
+	"github.com/jarvisgally/crossfire/proxy/socks5"
 )
 
 func init() {
@@ -93,57 +93,21 @@ func (s *Server) Handshake(underlay net.Conn) (io.ReadWriteCloser, *proxy.Target
 	}
 	rn += 2
 
-	reqOneByte := common.GetBuffer(1)
-	defer common.PutBuffer(reqOneByte)
-
 	// Parse command
-	_, err = io.ReadFull(c.Conn, reqOneByte)
+	reqCmd := common.GetBuffer(1)
+	defer common.PutBuffer(reqCmd)
+	_, err = io.ReadFull(c.Conn, reqCmd)
 	if err != nil {
 		return nil, nil, err
 	}
 	rn += 1
 
 	// Parse address
-	addr := &proxy.TargetAddr{}
-	_, err = io.ReadFull(c.Conn, reqOneByte)
+	addr, rnn, err := socks5.ReadTargetAddr(c.Conn)
 	if err != nil {
 		return nil, nil, err
 	}
-	rn += 1
-
-	l := 0
-	switch reqOneByte[0] {
-	case socks5.ATypIP4:
-		l = net.IPv4len
-		addr.IP = make(net.IP, net.IPv4len)
-	case socks5.ATypDomain:
-		// 解码域名的长度
-		_, err = io.ReadFull(c.Conn, reqOneByte)
-		if err != nil {
-			return nil, nil, err
-		}
-		rn += 1
-		l = int(reqOneByte[0])
-	case socks5.ATypIP6:
-		l = net.IPv6len
-		addr.IP = make(net.IP, net.IPv6len)
-	default:
-		return nil, nil, fmt.Errorf("unknown address type %v", reqOneByte[0])
-	}
-
-	reqAddr := common.GetBuffer(l + 2)
-	defer common.PutBuffer(reqAddr)
-	_, err = io.ReadFull(c.Conn, reqAddr)
-	if err != nil {
-		return nil, nil, err
-	}
-	rn += l + 2
-	if addr.IP != nil {
-		copy(addr.IP, reqAddr[:l])
-	} else {
-		addr.Name = string(reqAddr[:l])
-	}
-	addr.Port = int(binary.BigEndian.Uint16(reqAddr[l : l+2]))
+	rn += rnn
 	c.target = addr.String()
 
 	// CRLF
@@ -167,7 +131,7 @@ type ServerConn struct {
 	ip   string
 
 	target string
-	user   proxy.User
+	user   *User
 }
 
 func (c *ServerConn) Write(p []byte) (int, error) {

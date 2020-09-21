@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
-	"github.com/jarvisgally/crossfire/proxy"
+	user2 "github.com/jarvisgally/crossfire/user"
 	"google.golang.org/grpc"
 	"testing"
 	"time"
@@ -20,7 +20,7 @@ func TestServerAPI(t *testing.T) {
 	userId := "hash1234"
 	newUserId := "hash4567"
 
-	auth := proxy.NewMeterManager(ctx)
+	auth := user2.NewMeterManager(ctx)
 	go RunServerAPI(ctx, auth, addr)
 	time.Sleep(time.Second * 3)
 

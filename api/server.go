@@ -8,14 +8,14 @@ import (
 	"log"
 	"net"
 
-	"github.com/jarvisgally/crossfire/proxy"
+	"github.com/jarvisgally/crossfire/user"
 	"google.golang.org/grpc"
 )
 
 // API for CrossFire server
 type ServerAPI struct {
 	ServerServiceServer
-	userManager proxy.UserManager
+	userManager user.UserManager
 }
 
 func (s *ServerAPI) GetUsers(stream ServerService_GetUsersServer) error {
@@ -180,7 +180,7 @@ func (s *ServerAPI) ListUsers(req *ListUsersRequest, stream ServerService_ListUs
 	return nil
 }
 
-func RunServerAPI(ctx context.Context, um proxy.UserManager, listenAddr string) error {
+func RunServerAPI(ctx context.Context, um user.UserManager, listenAddr string) error {
 	server := grpc.NewServer()
 	defer server.Stop()
 	RegisterServerServiceServer(server, &ServerAPI{

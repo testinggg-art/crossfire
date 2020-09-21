@@ -1,4 +1,4 @@
-package proxy
+package user
 
 import (
 	"context"

@@ -9,12 +9,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/jarvisgally/crossfire/proxy"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/jarvisgally/crossfire/user"
 )
 
 const (
@@ -25,7 +26,7 @@ const (
 
 // VMess user
 type User struct {
-	*proxy.Meter
+	*user.Meter
 	UUID [16]byte
 
 	// VMess协议会使用用户的UUID生成AlterId个新的UUID，随机的使用不同的UUID进行传输这个用户的流量
@@ -54,7 +55,7 @@ func NewUser(ctx context.Context, uuidStr, alterIdStr string) (*User, error) {
 	}
 
 	u := &User{
-		Meter:   proxy.NewMeter(ctx, uuidStr),
+		Meter:   user.NewMeter(ctx, uuidStr),
 		UUID:    uuid,
 		AlterId: int(alterId),
 		UUIDs:   uuids,
@@ -112,10 +113,10 @@ type UserManager struct {
 	ctx context.Context
 }
 
-func (um *UserManager) ListUsers() []proxy.User {
+func (um *UserManager) ListUsers() []user.User {
 	um.mux4Users.RLock()
 	defer um.mux4Users.RUnlock()
-	result := make([]proxy.User, len(um.users))
+	result := make([]user.User, len(um.users))
 	i := 0
 	for _, u := range um.users {
 		result[i] = u
@@ -124,7 +125,7 @@ func (um *UserManager) ListUsers() []proxy.User {
 	return result
 }
 
-func (um *UserManager) AuthUser(hash string) (bool, proxy.User) {
+func (um *UserManager) AuthUser(hash string) (bool, user.User) {
 	um.mux4Users.RLock()
 	defer um.mux4Users.RUnlock()
 	if user, found := um.users[hash]; found {

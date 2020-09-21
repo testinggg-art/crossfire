@@ -1,6 +1,11 @@
 package socks5
 
 import (
+	"encoding/binary"
+	"fmt"
+	"github.com/jarvisgally/crossfire/common"
+	"github.com/jarvisgally/crossfire/proxy"
+	"io"
 	"net"
 	"strconv"
 )
@@ -32,7 +37,7 @@ const (
 	ATypIP6    = 0x4
 )
 
-// ParseAddr parse a address string to bytes
+// ParseAddr parse a address string to bytes in socks5 format.
 //
 //        +------+----------+----------+
 //        | ATYP | DST.ADDR | DST.PORT |
@@ -74,4 +79,52 @@ func ParseAddr(s string) []byte {
 	addr[len(addr)-2], addr[len(addr)-1] = byte(portnum>>8), byte(portnum)
 
 	return addr
+}
+
+// ReadTargetAddr read bytes from conn and create a proxy.TargetAddr
+func ReadTargetAddr(r io.Reader) (*proxy.TargetAddr, int, error) {
+	reqOneByte := common.GetBuffer(1)
+	defer common.PutBuffer(reqOneByte)
+	rn := 0
+
+	addr := &proxy.TargetAddr{}
+	_, err := io.ReadFull(r, reqOneByte)
+	if err != nil {
+		return nil, rn, err
+	}
+	rn += 1
+
+	l := 0
+	switch reqOneByte[0] {
+	case ATypIP4:
+		l = net.IPv4len
+		addr.IP = make(net.IP, net.IPv4len)
+	case ATypDomain:
+		_, err = io.ReadFull(r, reqOneByte)
+		if err != nil {
+			return nil, rn, err
+		}
+		rn += 1
+		l = int(reqOneByte[0])
+	case ATypIP6:
+		l = net.IPv6len
+		addr.IP = make(net.IP, net.IPv6len)
+	default:
+		return nil, rn, fmt.Errorf("unknown address type %v", reqOneByte[0])
+	}
+
+	reqAddr := common.GetBuffer(l + 2)
+	defer common.PutBuffer(reqAddr)
+	_, err = io.ReadFull(r, reqAddr)
+	if err != nil {
+		return nil, rn, err
+	}
+	rn += l + 2
+	if addr.IP != nil {
+		copy(addr.IP, reqAddr[:l])
+	} else {
+		addr.Name = string(reqAddr[:l])
+	}
+	addr.Port = int(binary.BigEndian.Uint16(reqAddr[l : l+2]))
+	return addr, rn, nil
 }

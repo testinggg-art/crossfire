@@ -3,20 +3,21 @@ package trojan
 import (
 	"context"
 	"fmt"
-	"github.com/jarvisgally/crossfire/proxy"
 	"sync"
+
+	"github.com/jarvisgally/crossfire/user"
 )
 
 // Trojan user
 type User struct {
-	*proxy.Meter
+	*user.Meter
 
 	Hex string
 }
 
 func NewUser(ctx context.Context, password string) *User {
 	u := &User{
-		Meter: proxy.NewMeter(ctx, password),
+		Meter: user.NewMeter(ctx, password),
 		Hex:   SHA224String(password),
 	}
 	return u
@@ -30,7 +31,7 @@ type UserManager struct {
 	ctx context.Context
 }
 
-func (m *UserManager) AuthUser(hash string) (bool, proxy.User) {
+func (m *UserManager) AuthUser(hash string) (bool, user.User) {
 	m.mux4Users.RLock()
 	defer m.mux4Users.RUnlock()
 	if user, found := m.users[hash]; found {
@@ -72,10 +73,10 @@ func (m *UserManager) DelUser(hash string) error {
 	return nil
 }
 
-func (m *UserManager) ListUsers() []proxy.User {
+func (m *UserManager) ListUsers() []user.User {
 	m.mux4Users.RLock()
 	defer m.mux4Users.RUnlock()
-	result := make([]proxy.User, len(m.users))
+	result := make([]user.User, len(m.users))
 	i := 0
 	for _, u := range m.users {
 		result[i] = u

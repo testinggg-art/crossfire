@@ -1,21 +1,19 @@
-package direct
+package proxy
 
 import (
 	"context"
 	"io"
 	"net"
 	"net/url"
-
-	"github.com/jarvisgally/crossfire/proxy"
 )
 
 const name = "direct"
 
 func init() {
-	proxy.RegisterClient(name, NewDirectClient)
+	RegisterClient(name, NewDirectClient)
 }
 
-func NewDirectClient(ctx context.Context, url *url.URL) (proxy.Client, error) {
+func NewDirectClient(ctx context.Context, url *url.URL) (Client, error) {
 	return &Direct{}, nil
 }
 

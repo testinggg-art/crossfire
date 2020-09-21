@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/url"
 	"time"
@@ -43,73 +44,89 @@ func (s *Server) Name() string { return Name }
 func (s *Server) Addr() string { return s.addr }
 
 func (s *Server) Handshake(underlay net.Conn) (io.ReadWriteCloser, *proxy.TargetAddr, error) {
-	// Set handshake timeout 4 seconds
-	if err := underlay.SetReadDeadline(time.Now().Add(time.Second * 4)); err != nil {
+	// Set handshake timeout 3 seconds
+	if err := underlay.SetReadDeadline(time.Now().Add(time.Second * 3)); err != nil {
 		return nil, nil, err
 	}
 	defer underlay.SetReadDeadline(time.Time{})
 
+	reqOneByte := common.GetBuffer(1)
+	defer common.PutBuffer(reqOneByte)
+
 	// https://www.ietf.org/rfc/rfc1928.txt
-	buf := common.GetBuffer(512)
-	defer common.PutBuffer(buf)
 
-	// Read hello message
-	n, err := underlay.Read(buf)
-	if err != nil || n == 0 {
-		return nil, nil, fmt.Errorf("failed to read hello: %w", err)
+	//   The client connects to the server, and sends a version
+	//   identifier/method selection message:
+	//
+	//                   +----+----------+----------+
+	//                   |VER | NMETHODS | METHODS  |
+	//                   +----+----------+----------+
+	//                   | 1  |    1     | 1 to 255 |
+	//                   +----+----------+----------+
+	if _, err := io.ReadFull(underlay, reqOneByte); err != nil {
+		return nil, nil, fmt.Errorf("failed to read socks version: %v", err)
 	}
-	version := buf[0]
-	if version != Version5 {
-		return nil, nil, fmt.Errorf("unsupported socks version %v", version)
+	if reqOneByte[0] != Version5 {
+		return nil, nil, fmt.Errorf("invalid socks version %v", reqOneByte[0])
+	}
+	if _, err := io.ReadFull(underlay, reqOneByte); err != nil {
+		return nil, nil, errors.New("failed to read NMETHODS")
+	}
+	if _, err := io.CopyN(ioutil.Discard, underlay, int64(reqOneByte[0])); err != nil {
+		return nil, nil, fmt.Errorf("failed to read methods: %v", err)
 	}
 
-	// Write hello response
-	_, err = underlay.Write([]byte{Version5, AuthNone})
+	//   The server selects from one of the methods given in METHODS, and
+	//   sends a METHOD selection message:
+	//
+	//                         +----+--------+
+	//                         |VER | METHOD |
+	//                         +----+--------+
+	//                         | 1  |   1    |
+	//                         +----+--------+
+	if _, err := underlay.Write([]byte{Version5, AuthNone}); err != nil {
+		return nil, nil, fmt.Errorf("failed to write auth: %v", err)
+	}
+
+	//   The SOCKS request is formed as follows:
+	//
+	//        +----+-----+-------+------+----------+----------+
+	//        |VER | CMD |  RSV  | ATYP | DST.ADDR | DST.PORT |
+	//        +----+-----+-------+------+----------+----------+
+	//        | 1  |  1  | X'00' |  1   | Variable |    2     |
+	//        +----+-----+-------+------+----------+----------+
+	reqCmd := common.GetBuffer(3)
+	defer common.PutBuffer(reqCmd)
+	if _, err := io.ReadFull(underlay, reqCmd); err != nil {
+		return nil, nil, fmt.Errorf("failed to read command: %v", err)
+	}
+	cmd := reqCmd[1]
+
+	addr, _, err := ReadTargetAddr(underlay)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to write hello response: %w", err)
+		return nil, nil, fmt.Errorf("failed to read address: %v", err)
 	}
 
-	// Read command message
-	n, err = underlay.Read(buf)
-	if err != nil || n < 7 { // Shortest length is 7
-		return nil, nil, fmt.Errorf("failed to read command: %w", err)
-	}
-	cmd := buf[1]
-	if cmd != CmdConnect {
-		return nil, nil, fmt.Errorf("unsuppoted command %v", cmd)
-	}
-
-	addr := &proxy.TargetAddr{}
-	l := 2
-	off := 4
-	switch buf[3] {
-	case ATypIP4:
-		l += net.IPv4len
-		addr.IP = make(net.IP, net.IPv4len)
-	case ATypIP6:
-		l += net.IPv6len
-		addr.IP = make(net.IP, net.IPv6len)
-	case ATypDomain:
-		l += int(buf[4])
-		off += 1
+	//   The server evaluates the request, and
+	//   returns a reply formed as follows:
+	//
+	//        +----+-----+-------+------+----------+----------+
+	//        |VER | REP |  RSV  | ATYP | BND.ADDR | BND.PORT |
+	//        +----+-----+-------+------+----------+----------+
+	//        | 1  |  1  | X'00' |  1   | Variable |    2     |
+	//        +----+-----+-------+------+----------+----------+
+	switch cmd {
+	case CmdConnect:
+		_, err = underlay.Write([]byte{Version5, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+	case CmdUDPAssociate:
+		listenAddr := ParseAddr(underlay.LocalAddr().String())
+		_, err = underlay.Write(append([]byte{Version5, 0, 0}, listenAddr...))
+		// Keep the connection util timeout then the socket will be free
+		buf := common.GetBuffer(16)
+		defer common.PutBuffer(buf)
+		underlay.Read(buf)
 	default:
-		return nil, nil, fmt.Errorf("unknown address type %v", buf[3])
-	}
-
-	if len(buf[off:]) < l {
-		return nil, nil, errors.New("short command request")
-	}
-	if addr.IP != nil {
-		copy(addr.IP, buf[off:])
-	} else {
-		addr.Name = string(buf[off : off+l-2])
-	}
-	addr.Port = int(buf[off+l-2])<<8 | int(buf[off+l-1])
-
-	// Write command response
-	_, err = underlay.Write([]byte{Version5, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to write command response: %w", err)
+		return nil, nil, fmt.Errorf("unsupporte command %v", cmd)
 	}
 
 	return underlay, addr, err
