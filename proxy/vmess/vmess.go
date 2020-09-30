@@ -10,6 +10,8 @@ import (
 
 const Name = "vmess"
 
+// https://www.v2fly.org/developer/protocols/vmess.html
+
 // Request Options
 const (
 	OptBasicFormat byte = 0 // 不加密传输

@@ -10,6 +10,8 @@ const (
 	Name = "trojan"
 )
 
+// https://trojan-gfw.github.io/trojan/protocol
+
 var (
 	crlf = []byte{'\r', '\n'}
 )

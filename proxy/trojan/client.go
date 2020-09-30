@@ -2,7 +2,7 @@ package trojan
 
 import (
 	"context"
-	"io"
+	"errors"
 	"log"
 	"net"
 	"net/url"
@@ -43,7 +43,7 @@ func (c *Client) Name() string { return Name }
 
 func (c *Client) Addr() string { return c.addr }
 
-func (c *Client) Handshake(underlay net.Conn, target string) (io.ReadWriteCloser, error) {
+func (c *Client) Handshake(underlay net.Conn, target string) (proxy.StreamConn, error) {
 	conn := &ClientConn{Conn: underlay, target: target, user: c.user}
 
 	// Request
@@ -53,6 +53,10 @@ func (c *Client) Handshake(underlay net.Conn, target string) (io.ReadWriteCloser
 	}
 
 	return conn, nil
+}
+
+func (c *Client) Pack(underlay net.Conn) (proxy.PacketConn, error) {
+	return nil, errors.New("implement me")
 }
 
 type ClientConn struct {

@@ -59,7 +59,7 @@ func (s *Server) Name() string { return Name }
 
 func (s *Server) Addr() string { return s.addr }
 
-func (s *Server) Handshake(underlay net.Conn) (io.ReadWriteCloser, *proxy.TargetAddr, error) {
+func (s *Server) Handshake(underlay net.Conn) (proxy.StreamConn, *proxy.TargetAddr, error) {
 	// Set handshake timeout 3 seconds
 	if err := underlay.SetReadDeadline(time.Now().Add(time.Second * 3)); err != nil {
 		return nil, nil, err
@@ -202,6 +202,10 @@ func (s *Server) Handshake(underlay net.Conn) (io.ReadWriteCloser, *proxy.Target
 	return c, addr, nil
 }
 
+func (s *Server) Pack(underlay net.Conn) (proxy.PacketConn, error) {
+	return nil, errors.New("implement me")
+}
+
 // ServerConn wrapper a net.Conn with vmess protocol
 type ServerConn struct {
 	net.Conn
@@ -219,9 +223,9 @@ type ServerConn struct {
 	respBodyIV  [16]byte
 	respBodyKey [16]byte
 
-	sent  uint64
-	recv  uint64
-	ip    string
+	sent uint64
+	recv uint64
+	ip   string
 }
 
 func (c *ServerConn) Read(b []byte) (int, error) {

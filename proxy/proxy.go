@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jarvisgally/crossfire/common"
@@ -27,7 +28,10 @@ type Client interface {
 	Name() string
 	// Address to dail
 	Addr() string
-	Handshake(underlay net.Conn, target string) (io.ReadWriteCloser, error)
+	// Handshake with TCP server
+	Handshake(underlay net.Conn, target string) (StreamConn, error)
+	// Pack underlay net.packetConn
+	Pack(underlay net.Conn) (PacketConn, error)
 }
 
 // ClientCreator is a function to create client.
@@ -64,7 +68,10 @@ type Server interface {
 	Name() string
 	// Address to listen
 	Addr() string
-	Handshake(underlay net.Conn) (io.ReadWriteCloser, *TargetAddr, error)
+	// Handshake with TCP client
+	Handshake(underlay net.Conn) (StreamConn, *TargetAddr, error)
+	// Pack underlay net.packetConn
+	Pack(underlay net.Conn) (PacketConn, error)
 }
 
 // ServerCreator is a function to create proxy server
@@ -139,6 +146,19 @@ func NewTargetAddr(addr string) (*TargetAddr, error) {
 	return target, nil
 }
 
+// StreamConn for tcp relay
+type StreamConn interface {
+	io.Reader
+	io.Writer
+	io.Closer
+}
+
+// PacketConn for udp relay
+type PacketConn interface {
+	net.PacketConn
+	ReadWithTargetAddress([]byte) (int, net.Addr, *TargetAddr, error)
+}
+
 // Proxy
 type Proxy struct {
 	localServer                Server
@@ -155,7 +175,20 @@ func (p *Proxy) Execute() error {
 	if err != nil {
 		return fmt.Errorf("can not listen tcp on %v: %v", p.localServer.Addr(), err)
 	}
+	log.Printf("listening tcp on %v", p.localServer.Addr())
 	go p.tcpLoop(listener)
+	if p.localServer.Name() == "socks5" {
+		udpAddr, err := net.ResolveUDPAddr("udp", p.localServer.Addr())
+		if err != nil {
+			return fmt.Errorf("can not resolve udp address %s: %v", p.localServer.Addr(), err)
+		}
+		udpConn, err := net.ListenUDP("udp", udpAddr)
+		if err != nil {
+			return fmt.Errorf("can not listen udp on %v: %v", p.localServer.Addr(), err)
+		}
+		log.Printf("listening udp on %v", p.localServer.Addr())
+		go p.udpLoop(udpConn)
+	}
 	return nil
 }
 
@@ -163,6 +196,13 @@ func (p *Proxy) tcpLoop(listener net.Listener) {
 	for {
 		lc, err := listener.Accept()
 		if err != nil {
+			select {
+			case <-p.ctx.Done():
+				return
+			default:
+				//
+			}
+
 			errStr := err.Error()
 			if strings.Contains(errStr, "closed") {
 				break
@@ -174,10 +214,7 @@ func (p *Proxy) tcpLoop(listener net.Listener) {
 			continue
 		}
 		go func() {
-			var client Client
-
-			// 不同的服务端协议各自实现自己的响应逻辑, 其中返回的地址则用于匹配路由
-			// 常常需要额外编解码或者流量统计的功能，故需要给lc包一层以实现这些逻辑，即wlc
+			// Handshake with raw net.Conn from client and return a connection with protocol support
 			wlc, targetAddr, err := p.localServer.Handshake(lc)
 			if err != nil {
 				lc.Close()
@@ -186,27 +223,10 @@ func (p *Proxy) tcpLoop(listener net.Listener) {
 			}
 			defer wlc.Close()
 
-			// 匹配路由
-			if p.route == whitelist { // 白名单模式，如果匹配，则直接访问，否则使用代理访问
-				if p.matcher.Check(targetAddr.Host()) {
-					client = p.directClient
-				} else {
-					client = p.remoteClient
-				}
-			} else if p.route == blacklist { // 黑名单模式，如果匹配，则使用代理访问，否则直接访问
-				if p.matcher.Check(targetAddr.Host()) {
-					client = p.remoteClient
-				} else {
-					client = p.directClient
-				}
-			} else { // 全部流量使用代理访问
-				client = p.remoteClient
-			}
-			log.Printf("%v to %v", client.Name(), targetAddr)
-
-			// 连接远端地址
+			// Routing logic
+			client := p.pickClient(targetAddr)
 			dialAddr := p.remoteClient.Addr()
-			if _, ok := client.(*Direct); ok { // 直接访问则直接连接目标地址
+			if client.Name() == "direct" {
 				dialAddr = targetAddr.String()
 			}
 			rc, err := net.Dial("tcp", dialAddr)
@@ -215,7 +235,7 @@ func (p *Proxy) tcpLoop(listener net.Listener) {
 				return
 			}
 
-			// 不同的客户端协议各自实现自己的请求逻辑
+			// Handshake with raw net.Conn of remote server and return a connection with protocal support
 			wrc, err := client.Handshake(rc, targetAddr.String())
 			if err != nil {
 				rc.Close()
@@ -224,15 +244,114 @@ func (p *Proxy) tcpLoop(listener net.Listener) {
 			}
 			defer wrc.Close()
 
-			// 流量转发
+			// Traffic forward
 			go io.Copy(wrc, wlc)
 			io.Copy(wlc, wrc)
 		}()
 	}
 }
 
-func (p *Proxy) udpLoop() {
-	//
+func (p *Proxy) pickClient(targetAddr *TargetAddr) Client {
+	var client Client
+	if p.route == whitelist {
+		if p.matcher.Check(targetAddr.Host()) {
+			client = p.directClient
+		} else {
+			client = p.remoteClient
+		}
+	} else if p.route == blacklist {
+		if p.matcher.Check(targetAddr.Host()) {
+			client = p.remoteClient
+		} else {
+			client = p.directClient
+		}
+	} else {
+		client = p.remoteClient
+	}
+	log.Printf("%v to %v", client.Name(), targetAddr)
+	return client
+}
+
+func (p *Proxy) udpLoop(lc *net.UDPConn) {
+	defer lc.Close()
+	var nm sync.Map
+	packetBuf := make([]byte, common.UDPBufSize)
+
+	for {
+		// Parse incoming packet and return a packet with protocol support
+		wlc, err := p.localServer.Pack(lc)
+		if err != nil {
+			log.Printf("failed in pack: %v", err)
+			continue
+		}
+		n, remoteAddr, targetAddr, err := wlc.ReadWithTargetAddress(packetBuf) // Read from local client
+		if err != nil {
+			log.Printf("failed in read udp: %v", err)
+			continue
+		}
+
+		var wrc PacketConn
+		v, ok := nm.Load(remoteAddr.String()) // Reuse connection
+		if !ok && v == nil {
+			// Routing logic
+			client := p.pickClient(targetAddr)
+			dialAddr := p.remoteClient.Addr()
+			var rc net.Conn
+			if client.Name() == "direct" { // UDP directly
+				dialAddr = targetAddr.String()
+				udpDialAddr, err := net.ResolveUDPAddr("udp", dialAddr)
+				if err != nil {
+					log.Printf("failed to resolve dail address %v: %v", dialAddr, err)
+					continue
+				}
+				zeroAddr := &net.UDPAddr{IP: net.IPv4zero, Port: 0}
+				rc, err = net.DialUDP("udp", zeroAddr, udpDialAddr)
+			} else { // UDP over TCP
+				rc, err = net.Dial("tcp", dialAddr)
+			}
+			if err != nil {
+				log.Printf("failed to dail to %v: %v", dialAddr, err)
+				continue
+			}
+
+			// Parse outgoing packet and return a packet with protocol support
+			wrc, err := client.Pack(rc)
+			if err != nil {
+				log.Printf("failed to pack: %v", err)
+				continue
+			}
+			nm.Store(remoteAddr.String(), wrc)
+
+			// Traffic forwarding
+			go func() {
+				b := common.GetBuffer(common.UDPBufSize)
+				defer common.PutBuffer(b)
+
+				for {
+					wrc.SetReadDeadline(time.Now().Add(2 * time.Minute))
+					n, _, err := wrc.ReadFrom(b) // Read from remove server
+					if err != nil {
+						return
+					}
+					_, err = wlc.WriteTo(b[:n], remoteAddr) // Write to local client
+					if err != nil {
+						return
+					}
+				}
+
+				wrc.Close()
+				nm.Delete(remoteAddr.String())
+			}()
+		} else {
+			wrc = v.(PacketConn)
+		}
+
+		_, err = wrc.WriteTo(packetBuf[:n], remoteAddr) // Write to remote server
+		if err != nil {
+			log.Printf("failed in write udp to remote: %v", err)
+			continue
+		}
+	}
 }
 
 func NewProxy(ctx context.Context, local, remote, route string) (*Proxy, error) {

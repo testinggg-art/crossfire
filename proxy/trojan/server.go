@@ -47,7 +47,7 @@ func (s *Server) Name() string { return Name }
 
 func (s *Server) Addr() string { return s.addr }
 
-func (s *Server) Handshake(underlay net.Conn) (io.ReadWriteCloser, *proxy.TargetAddr, error) {
+func (s *Server) Handshake(underlay net.Conn) (proxy.StreamConn, *proxy.TargetAddr, error) {
 	// Set handshake timeout 3 seconds
 	if err := underlay.SetReadDeadline(time.Now().Add(time.Second * 3)); err != nil {
 		return nil, nil, err
@@ -121,6 +121,10 @@ func (s *Server) Handshake(underlay net.Conn) (io.ReadWriteCloser, *proxy.Target
 	c.user.AddTraffic(rn, 0)
 
 	return c, addr, nil
+}
+
+func (s *Server) Pack(underlay net.Conn) (proxy.PacketConn, error) {
+	return nil, errors.New("implement me")
 }
 
 // ServerConn wrapper a net.Conn with trojan protocol

@@ -86,7 +86,7 @@ func (c *Client) Name() string { return Name }
 
 func (c *Client) Addr() string { return c.addr }
 
-func (c *Client) Handshake(underlay net.Conn, target string) (io.ReadWriteCloser, error) {
+func (c *Client) Handshake(underlay net.Conn, target string) (proxy.StreamConn, error) {
 	r := rand.Intn(len(c.user.UUIDs))
 	conn := &ClientConn{Conn: underlay, target: target, user: c.user, uuid: c.user.UUIDs[r], opt: c.opt, security: c.security}
 	var err error
@@ -116,6 +116,10 @@ func (c *Client) Handshake(underlay net.Conn, target string) (io.ReadWriteCloser
 	}
 
 	return conn, nil
+}
+
+func (c *Client) Pack(underlay net.Conn) (proxy.PacketConn, error) {
+	return nil, errors.New("implement me")
 }
 
 // ClientConn is a connection to vmess server
