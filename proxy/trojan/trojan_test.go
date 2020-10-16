@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/jarvisgally/crossfire/common"
 	"io"
 	"log"
 	"net"
 	"testing"
 
+	"github.com/jarvisgally/crossfire/common"
 	"github.com/jarvisgally/crossfire/proxy"
 )
 
@@ -19,15 +19,11 @@ func TestTrojan(t *testing.T) {
 
 	port := common.PickPort("tcp", "127.0.0.1")
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
-	url := "trojan://a684455c-b14f-11ea-bf0d-42010aaa0003@" + addr
+	url := "trojan://hash1234@" + addr
 	server, err := proxy.ServerFromURL(ctx, url)
-	if err != nil {
-		return
-	}
+	common.Must(err)
 	client, err := proxy.ClientFromURL(ctx, url)
-	if err != nil {
-		return
-	}
+	common.Must(err)
 
 	target := "dummy.com:80"
 

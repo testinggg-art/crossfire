@@ -16,6 +16,7 @@ import (
 
 	"github.com/jarvisgally/crossfire/proxy"
 	_ "github.com/jarvisgally/crossfire/proxy"
+	_ "github.com/jarvisgally/crossfire/proxy/direct"
 	_ "github.com/jarvisgally/crossfire/proxy/socks5"
 	_ "github.com/jarvisgally/crossfire/proxy/tls"
 	_ "github.com/jarvisgally/crossfire/proxy/trojan"

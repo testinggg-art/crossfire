@@ -2,7 +2,6 @@ package trojan
 
 import (
 	"context"
-	"errors"
 	"log"
 	"net"
 	"net/url"
@@ -56,7 +55,9 @@ func (c *Client) Handshake(underlay net.Conn, target string) (proxy.StreamConn, 
 }
 
 func (c *Client) Pack(underlay net.Conn) (proxy.PacketConn, error) {
-	return nil, errors.New("implement me")
+	return &PacketConn{
+		Conn: underlay,
+	}, nil
 }
 
 type ClientConn struct {

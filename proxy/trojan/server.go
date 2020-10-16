@@ -124,7 +124,9 @@ func (s *Server) Handshake(underlay net.Conn) (proxy.StreamConn, *proxy.TargetAd
 }
 
 func (s *Server) Pack(underlay net.Conn) (proxy.PacketConn, error) {
-	return nil, errors.New("implement me")
+	return &PacketConn{
+		Conn: underlay,
+	}, nil
 }
 
 // ServerConn wrapper a net.Conn with trojan protocol

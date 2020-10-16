@@ -156,7 +156,7 @@ type StreamConn interface {
 // PacketConn for udp relay
 type PacketConn interface {
 	net.PacketConn
-	ReadWithTargetAddress([]byte) (int, net.Addr, *TargetAddr, error)
+	GetTargetAddr() *TargetAddr
 }
 
 // Proxy
@@ -235,7 +235,7 @@ func (p *Proxy) tcpLoop(listener net.Listener) {
 				return
 			}
 
-			// Handshake with raw net.Conn of remote server and return a connection with protocal support
+			// Handshake with raw net.Conn of remote server and return a connection with protocol support
 			wrc, err := client.Handshake(rc, targetAddr.String())
 			if err != nil {
 				rc.Close()
@@ -279,18 +279,19 @@ func (p *Proxy) udpLoop(lc *net.UDPConn) {
 
 	for {
 		// Parse incoming packet and return a packet with protocol support
-		wlc, err := p.localServer.Pack(lc)
+		plc, err := p.localServer.Pack(lc)
 		if err != nil {
 			log.Printf("failed in pack: %v", err)
 			continue
 		}
-		n, remoteAddr, targetAddr, err := wlc.ReadWithTargetAddress(packetBuf) // Read from local client
+		n, remoteAddr, err := plc.ReadFrom(packetBuf) // Read from local client
 		if err != nil {
 			log.Printf("failed in read udp: %v", err)
 			continue
 		}
+		targetAddr := plc.GetTargetAddr()
 
-		var wrc PacketConn
+		var prc PacketConn
 		v, ok := nm.Load(remoteAddr.String()) // Reuse connection
 		if !ok && v == nil {
 			// Routing logic
@@ -306,21 +307,32 @@ func (p *Proxy) udpLoop(lc *net.UDPConn) {
 				}
 				zeroAddr := &net.UDPAddr{IP: net.IPv4zero, Port: 0}
 				rc, err = net.DialUDP("udp", zeroAddr, udpDialAddr)
+				if err != nil {
+					log.Printf("failed to dail udp to %v: %v", dialAddr, err)
+					continue
+				}
 			} else { // UDP over TCP
 				rc, err = net.Dial("tcp", dialAddr)
-			}
-			if err != nil {
-				log.Printf("failed to dail to %v: %v", dialAddr, err)
-				continue
+				if err != nil {
+					log.Printf("failed to dail tcp to %v: %v", dialAddr, err)
+					continue
+				}
+				wrc, err := client.Handshake(rc, targetAddr.String())
+				if err != nil {
+					rc.Close()
+					log.Printf("failed in handshake to %v: %v", dialAddr, err)
+					continue
+				}
+				rc = wrc.(net.Conn)
 			}
 
 			// Parse outgoing packet and return a packet with protocol support
-			wrc, err := client.Pack(rc)
+			prc, err := client.Pack(rc)
 			if err != nil {
 				log.Printf("failed to pack: %v", err)
 				continue
 			}
-			nm.Store(remoteAddr.String(), wrc)
+			nm.Store(remoteAddr.String(), prc)
 
 			// Traffic forwarding
 			go func() {
@@ -328,25 +340,25 @@ func (p *Proxy) udpLoop(lc *net.UDPConn) {
 				defer common.PutBuffer(b)
 
 				for {
-					wrc.SetReadDeadline(time.Now().Add(2 * time.Minute))
-					n, _, err := wrc.ReadFrom(b) // Read from remove server
+					prc.SetReadDeadline(time.Now().Add(2 * time.Minute))
+					n, _, err := prc.ReadFrom(b) // Read from remote server
 					if err != nil {
 						return
 					}
-					_, err = wlc.WriteTo(b[:n], remoteAddr) // Write to local client
+					_, err = plc.WriteTo(b[:n], remoteAddr) // Write to local client
 					if err != nil {
 						return
 					}
 				}
 
-				wrc.Close()
+				prc.Close()
 				nm.Delete(remoteAddr.String())
 			}()
 		} else {
-			wrc = v.(PacketConn)
+			prc = v.(PacketConn)
 		}
 
-		_, err = wrc.WriteTo(packetBuf[:n], remoteAddr) // Write to remote server
+		_, err = prc.WriteTo(packetBuf[:n], remoteAddr) // Write to remote server
 		if err != nil {
 			log.Printf("failed in write udp to remote: %v", err)
 			continue
@@ -370,7 +382,10 @@ func NewProxy(ctx context.Context, local, remote, route string) (*Proxy, error) 
 	if err != nil {
 		return nil, fmt.Errorf("can not create remote client: %v", err)
 	}
-	proxy.directClient, _ = ClientFromURL(ctx, "direct://")
+	proxy.directClient, err = ClientFromURL(ctx, "direct://")
+	if err != nil {
+		return nil, fmt.Errorf("can not create direct client: %v", err)
+	}
 	proxy.route = route
 	proxy.matcher = common.NewMather(route)
 

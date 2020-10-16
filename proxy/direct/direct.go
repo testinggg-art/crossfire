@@ -2,7 +2,6 @@ package direct
 
 import (
 	"context"
-	"errors"
 	"github.com/jarvisgally/crossfire/proxy"
 	"net"
 	"net/url"
@@ -38,6 +37,6 @@ type PacketConn struct {
 	net.PacketConn
 }
 
-func (pc *PacketConn) ReadWithTargetAddress(p []byte) (int, net.Addr, *proxy.TargetAddr, error) {
-	return 0, nil, nil, errors.New("unsupported")
+func (pc *PacketConn) GetTargetAddr() *proxy.TargetAddr {
+	return nil
 }

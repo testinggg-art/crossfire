@@ -134,5 +134,8 @@ func (s *Server) Handshake(underlay net.Conn) (proxy.StreamConn, *proxy.TargetAd
 }
 
 func (s *Server) Pack(underlay net.Conn) (proxy.PacketConn, error) {
-	return nil, errors.New("implement me")
+	return &PacketConn{
+		PacketConn: underlay.(net.PacketConn),
+	}, nil
 }
+

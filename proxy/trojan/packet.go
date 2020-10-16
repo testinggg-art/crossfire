@@ -7,33 +7,36 @@ import (
 	"net"
 
 	"github.com/jarvisgally/crossfire/common"
+	"github.com/jarvisgally/crossfire/proxy"
 	"github.com/jarvisgally/crossfire/proxy/socks5"
 )
 
-type PktConn struct {
-	// TCP connection for UDP ASSOCIATE
+type PacketConn struct {
+	// UDP over TCP
 	net.Conn
 
 	// Target address
-	target string
+	targetAddr *proxy.TargetAddr
 }
 
-// NewPktConn returns a PktConn.
-func NewPktConn(c net.Conn, target string) *PktConn {
-	pc := &PktConn{
-		Conn:   c,
-		target: target,
-	}
-	return pc
-}
+// https://trojan-gfw.github.io/trojan/protocol
 
-// ReadFrom implements the necessary function of net.PacketConn.
-func (pc *PktConn) ReadFrom(b []byte) (int, net.Addr, error) {
-	// ATYP, DST.ADDR, DST.PORT
-	_, _, err := socks5.ReadTargetAddr(pc.Conn)
+//    Each UDP packet has the following format:
+//
+//      +------+----------+----------+--------+---------+----------+
+//	    | ATYP | DST.ADDR | DST.PORT | Length |  CRLF   | Payload  |
+//      +------+----------+----------+--------+---------+----------+
+//      |  1   | Variable |    2     |   2    | X'0D0A' | Variable |
+//      +------+----------+----------+--------+---------+----------+
+
+// ReadFrom overrides the original function from net.PacketConn.
+func (pc *PacketConn) ReadFrom(b []byte) (int, net.Addr, error) {
+	// Address
+	targetAddr, _, err := socks5.ReadTargetAddr(pc.Conn)
 	if err != nil {
 		return 0, nil, err
 	}
+	pc.targetAddr = targetAddr
 
 	// Length
 	if _, err = io.ReadFull(pc.Conn, b[:2]); err != nil {
@@ -56,18 +59,22 @@ func (pc *PktConn) ReadFrom(b []byte) (int, net.Addr, error) {
 		return 0, nil, err
 	}
 
-	// TODO: check the addr in return value, it's a fake packetConn so the addr is not valid
 	return n, nil, err
 }
 
-// WriteTo implements the necessary function of net.PacketConn.
-func (pc *PktConn) WriteTo(b []byte, addr net.Addr) (int, error) {
+// WriteTo overrides the original function from net.PacketConn.
+func (pc *PacketConn) WriteTo(b []byte, addr net.Addr) (int, error) {
 	buf := common.GetWriteBuffer()
 	defer common.PutWriteBuffer(buf)
 
-	buf.Write(socks5.ParseAddr(pc.target))
+	buf.Write(socks5.ParseAddr(pc.targetAddr.String()))
 	binary.Write(buf, binary.BigEndian, uint16(len(b)))
 	buf.Write(crlf)
 	buf.Write(b)
+
 	return pc.Write(buf.Bytes())
+}
+
+func (pc *PacketConn) GetTargetAddr() *proxy.TargetAddr {
+	return pc.targetAddr
 }
