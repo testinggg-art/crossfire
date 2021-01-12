@@ -43,7 +43,7 @@ func (s *Server) Name() string { return Name }
 
 func (s *Server) Addr() string { return s.addr }
 
-func (s *Server) Handshake(underlay net.Conn) (proxy.StreamConn, *proxy.TargetAddr, error) {
+func (s *Server) Handshake(underlay net.Conn) (proxy.StreamConn, *proxy.Target, error) {
 	// TODO: MOVE to proxy
 	// Set handshake timeout 3 seconds
 	if err := underlay.SetReadDeadline(time.Now().Add(time.Second * 3)); err != nil {
@@ -103,10 +103,11 @@ func (s *Server) Handshake(underlay net.Conn) (proxy.StreamConn, *proxy.TargetAd
 	}
 	cmd := reqCmd[1]
 
-	addr, _, err := ReadTargetAddr(underlay)
+	target, _, err := ReadTarget(underlay)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to read address: %v", err)
 	}
+	target.Network = "tcp"
 
 	//   The server evaluates the request, and
 	//   returns a reply formed as follows:
@@ -127,15 +128,14 @@ func (s *Server) Handshake(underlay net.Conn) (proxy.StreamConn, *proxy.TargetAd
 		defer common.PutBuffer(buf)
 		underlay.Read(buf)
 	default:
-		return nil, nil, fmt.Errorf("unsupporte command %v", cmd)
+		return nil, nil, fmt.Errorf("unsupported command %v", cmd)
 	}
 
-	return underlay, addr, err
+	return underlay, target, err
 }
 
 func (s *Server) Pack(underlay net.Conn) (proxy.PacketConn, error) {
 	return &PacketConn{
-		PacketConn: underlay.(net.PacketConn),
+		UDPConn: underlay.(*net.UDPConn),
 	}, nil
 }
-

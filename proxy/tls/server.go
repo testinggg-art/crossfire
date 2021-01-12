@@ -31,9 +31,9 @@ func NewTlsServer(ctx context.Context, url *url.URL) (proxy.Server, error) {
 		return nil, err
 	}
 	fallback := query.Get("fallback")
-	var fallbackAddr *proxy.TargetAddr
+	var fallbackAddr *proxy.Target
 	if fallback != "" {
-		fallbackAddr, err = proxy.NewTargetAddr(fallback)
+		fallbackAddr, err = proxy.NewTarget(fallback, "tcp")
 		if err != nil {
 			return nil, fmt.Errorf("invalid fallback %v", fallbackAddr)
 		}
@@ -47,7 +47,10 @@ func NewTlsServer(ctx context.Context, url *url.URL) (proxy.Server, error) {
 	}
 
 	url.Scheme = strings.TrimSuffix(url.Scheme, "s")
-	s.inner, _ = proxy.ServerFromURL(ctx, url.String())
+	s.inner, err = proxy.ServerFromURL(ctx, url.String())
+	if err != nil {
+		return nil, fmt.Errorf("can not create inner server: %v", err)
+	}
 
 	return s, nil
 }
@@ -55,7 +58,7 @@ func NewTlsServer(ctx context.Context, url *url.URL) (proxy.Server, error) {
 type Server struct {
 	name         string
 	addr         string
-	fallbackAddr *proxy.TargetAddr
+	fallbackAddr *proxy.Target
 	tlsConfig    *stdtls.Config
 
 	inner proxy.Server
@@ -65,7 +68,7 @@ func (s *Server) Name() string { return s.name }
 
 func (s *Server) Addr() string { return s.addr }
 
-func (s *Server) Handshake(underlay net.Conn) (proxy.StreamConn, *proxy.TargetAddr, error) {
+func (s *Server) Handshake(underlay net.Conn) (proxy.StreamConn, *proxy.Target, error) {
 	tlsConn := stdtls.Server(underlay, s.tlsConfig)
 	err := tlsConn.Handshake()
 	if err != nil {

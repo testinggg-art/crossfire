@@ -43,14 +43,14 @@ func (c *Client) Name() string { return c.name }
 
 func (c *Client) Addr() string { return c.addr }
 
-func (c *Client) Handshake(underlay net.Conn, target string) (proxy.StreamConn, error) {
-	cc := stdtls.Client(underlay, c.tlsConfig)
-	err := cc.Handshake()
+func (c *Client) Handshake(underlay net.Conn, target *proxy.Target) (proxy.StreamConn, error) {
+	c0 := stdtls.Client(underlay, c.tlsConfig)
+	err := c0.Handshake()
 	if err != nil {
 		return nil, err
 	}
 
-	return c.inner.Handshake(cc, target)
+	return c.inner.Handshake(c0, target)
 }
 
 func (c *Client) Pack(underlay net.Conn) (proxy.PacketConn, error) {

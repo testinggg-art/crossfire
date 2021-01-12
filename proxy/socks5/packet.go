@@ -11,11 +11,7 @@ import (
 )
 
 type PacketConn struct {
-	// Connection from client
-	net.PacketConn
-
-	// Target address
-	targetAddr *proxy.TargetAddr
+	*net.UDPConn
 }
 
 // https://tools.ietf.org/html/rfc1928#section-7
@@ -28,41 +24,34 @@ type PacketConn struct {
 //      | 2  |  1   |  1   | Variable |    2     | Variable |
 //      +----+------+------+----------+----------+----------+
 
-// ReadFrom overrides the original function from net.PacketConn.
-func (pc *PacketConn) ReadFrom(p []byte) (int, net.Addr, error) {
+func (pc *PacketConn) ReadWithTarget(p []byte) (int, net.Addr, *proxy.Target, error) {
 	buf := common.GetBuffer(len(p))
 	defer common.PutBuffer(buf)
 
-	n, remoteAddr, err := pc.PacketConn.ReadFrom(buf)
+	n, remoteAddr, err := pc.UDPConn.ReadFrom(buf)
 	if err != nil {
-		return n, remoteAddr, err
+		return n, remoteAddr, nil, err
 	}
 	if n < 3 {
-		return n, remoteAddr, errors.New("not enough size to get addr")
+		return n, remoteAddr, nil, errors.New("not enough size to get addr")
 	}
 
-	targetAddr, rn, err := ReadTargetAddr(bytes.NewReader(buf[3:]))
+	target, rn, err := ReadTarget(bytes.NewReader(buf[3:]))
 	if err != nil {
-		return n, remoteAddr, fmt.Errorf("failed to read target address: %v", err)
+		return n, remoteAddr, target, fmt.Errorf("failed to read target address: %v", err)
 	}
-	pc.targetAddr = targetAddr
 
 	copy(p, buf[3+rn:])
-	return n, remoteAddr, nil
+	return n - 3 - rn, remoteAddr, target, nil
 }
 
-// WriteTo overrides the original function from net.PacketConn.
-func (pc *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
+func (pc *PacketConn) WriteWithTarget(p []byte, addr net.Addr, target *proxy.Target) (n int, err error) {
 	buf := common.GetWriteBuffer()
 	defer common.PutWriteBuffer(buf)
 
 	buf.Write([]byte{0, 0, 0})
-	buf.Write(ParseAddr(pc.targetAddr.String()))
+	buf.Write(ParseAddr(target.Addr()))
 	buf.Write(p)
 
-	return pc.PacketConn.WriteTo(buf.Bytes(), addr)
-}
-
-func (pc *PacketConn) GetTargetAddr() *proxy.TargetAddr {
-	return pc.targetAddr
+	return pc.UDPConn.WriteTo(buf.Bytes(), addr)
 }

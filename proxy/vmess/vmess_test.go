@@ -21,29 +21,19 @@ func TestVMess(t *testing.T) {
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	url := "vmess://a684455c-b14f-11ea-bf0d-42010aaa0003:4@" + addr
 	server, err := proxy.ServerFromURL(ctx, url)
-	if err != nil {
-		return
-	}
+	common.Must(err)
 	client, err := proxy.ClientFromURL(ctx, url)
-	if err != nil {
-		return
-	}
+	common.Must(err)
 
-	target := "dummy.com:80"
+	theTarget, err := proxy.NewTarget("dummy.com:80", "tcp")
+	common.Must(err)
 
-	// 开始监听
 	listener, err := net.Listen("tcp", server.Addr())
-	if err != nil {
-		t.Logf("can not listen on %v: %v", server.Addr(), err)
-		return
-	}
+	common.Must(err)
 	go func() {
 		for {
 			lc, err := listener.Accept()
-			if err != nil {
-				t.Logf("failed in accept: %v", err)
-				break
-			}
+			common.Must(err)
 			go func() {
 				defer lc.Close()
 				wlc, targetAddr, err := server.Handshake(lc)
@@ -52,7 +42,7 @@ func TestVMess(t *testing.T) {
 					return
 				}
 
-				if targetAddr.String() != target {
+				if targetAddr.Addr() != theTarget.Addr() {
 					t.Fail()
 				}
 
@@ -67,11 +57,10 @@ func TestVMess(t *testing.T) {
 		}
 	}()
 
-	// 连接
 	rc, _ := net.Dial("tcp", server.Addr())
 	defer rc.Close()
 
-	wrc, err := client.Handshake(rc, target)
+	wrc, err := client.Handshake(rc, theTarget)
 	if err != nil {
 		log.Printf("failed in handshake to %v: %v", server.Addr(), err)
 		return
@@ -83,6 +72,4 @@ func TestVMess(t *testing.T) {
 	if !bytes.Equal(world[:], []byte("world")) {
 		t.Fail()
 	}
-
-	// TODO: 测试重放攻击等
 }

@@ -42,7 +42,7 @@ func (c *Client) Name() string { return Name }
 
 func (c *Client) Addr() string { return c.addr }
 
-func (c *Client) Handshake(underlay net.Conn, target string) (proxy.StreamConn, error) {
+func (c *Client) Handshake(underlay net.Conn, target *proxy.Target) (proxy.StreamConn, error) {
 	conn := &ClientConn{Conn: underlay, target: target, user: c.user}
 
 	// Request
@@ -61,7 +61,7 @@ func (c *Client) Pack(underlay net.Conn) (proxy.PacketConn, error) {
 }
 
 type ClientConn struct {
-	target string
+	target *proxy.Target
 	user   *User
 
 	net.Conn
@@ -77,8 +77,12 @@ func (c *ClientConn) Request() error {
 
 	buf.Write([]byte(c.user.Hex))
 	buf.Write(crlf)
-	buf.WriteByte(socks5.CmdConnect)
-	buf.Write(socks5.ParseAddr(c.target))
+	if c.target.Network == "udp" {
+		buf.WriteByte(socks5.CmdUDPAssociate)
+	} else {
+		buf.WriteByte(socks5.CmdConnect)
+	}
+	buf.Write(socks5.ParseAddr(c.target.Addr()))
 	buf.Write(crlf)
 
 	n, err := c.Conn.Write(buf.Bytes())

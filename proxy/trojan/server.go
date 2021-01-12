@@ -47,7 +47,7 @@ func (s *Server) Name() string { return Name }
 
 func (s *Server) Addr() string { return s.addr }
 
-func (s *Server) Handshake(underlay net.Conn) (proxy.StreamConn, *proxy.TargetAddr, error) {
+func (s *Server) Handshake(underlay net.Conn) (proxy.StreamConn, *proxy.Target, error) {
 	// Set handshake timeout 3 seconds
 	if err := underlay.SetReadDeadline(time.Now().Add(time.Second * 3)); err != nil {
 		return nil, nil, err
@@ -101,14 +101,24 @@ func (s *Server) Handshake(underlay net.Conn) (proxy.StreamConn, *proxy.TargetAd
 		return nil, nil, err
 	}
 	rn += 1
+	cmd := reqCmd[0]
 
 	// Parse address
-	addr, rnn, err := socks5.ReadTargetAddr(c.Conn)
+	target, rnn, err := socks5.ReadTarget(c.Conn)
 	if err != nil {
 		return nil, nil, err
 	}
 	rn += rnn
-	c.target = addr.String()
+	c.target = target.Addr()
+
+	switch cmd {
+	case socks5.CmdConnect:
+		target.Network = "tcp"
+	case socks5.CmdUDPAssociate:
+		target.Network = "udp"
+	default:
+		return nil, nil, fmt.Errorf("unsupported command %v", cmd)
+	}
 
 	// CRLF
 	_, err = io.ReadFull(c.Conn, reqCrlf)
@@ -120,7 +130,7 @@ func (s *Server) Handshake(underlay net.Conn) (proxy.StreamConn, *proxy.TargetAd
 	c.sent += uint64(rn)
 	c.user.AddTraffic(rn, 0)
 
-	return c, addr, nil
+	return c, target, nil
 }
 
 func (s *Server) Pack(underlay net.Conn) (proxy.PacketConn, error) {

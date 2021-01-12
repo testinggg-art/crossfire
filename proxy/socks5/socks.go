@@ -81,13 +81,20 @@ func ParseAddr(s string) []byte {
 	return addr
 }
 
-// ReadTargetAddr read bytes from conn and create a proxy.TargetAddr
-func ReadTargetAddr(r io.Reader) (*proxy.TargetAddr, int, error) {
+// ReadTarget read bytes from conn and create a proxy.Target with address
+//
+//        +------+----------+----------+
+//        | ATYP | DST.ADDR | DST.PORT |
+//        +------+----------+----------+
+//        |  1   | Variable |    2     |
+//        +------+----------+----------+
+//
+func ReadTarget(r io.Reader) (*proxy.Target, int, error) {
 	reqOneByte := common.GetBuffer(1)
 	defer common.PutBuffer(reqOneByte)
 	rn := 0
 
-	addr := &proxy.TargetAddr{}
+	addr := &proxy.Target{}
 	_, err := io.ReadFull(r, reqOneByte)
 	if err != nil {
 		return nil, rn, err

@@ -12,11 +12,7 @@ import (
 )
 
 type PacketConn struct {
-	// UDP over TCP
 	net.Conn
-
-	// Target address
-	targetAddr *proxy.TargetAddr
 }
 
 // https://trojan-gfw.github.io/trojan/protocol
@@ -29,52 +25,45 @@ type PacketConn struct {
 //      |  1   | Variable |    2     |   2    | X'0D0A' | Variable |
 //      +------+----------+----------+--------+---------+----------+
 
-// ReadFrom overrides the original function from net.PacketConn.
-func (pc *PacketConn) ReadFrom(b []byte) (int, net.Addr, error) {
+func (pc *PacketConn) ReadWithTarget(p []byte) (int, net.Addr, *proxy.Target, error) {
 	// Address
-	targetAddr, _, err := socks5.ReadTargetAddr(pc.Conn)
+	target, _, err := socks5.ReadTarget(pc.Conn)
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, nil, err
 	}
-	pc.targetAddr = targetAddr
 
 	// Length
-	if _, err = io.ReadFull(pc.Conn, b[:2]); err != nil {
-		return 0, nil, err
+	if _, err = io.ReadFull(pc.Conn, p[:2]); err != nil {
+		return 0, nil, target, err
 	}
 
-	length := int(binary.BigEndian.Uint16(b[:2]))
-	if length > common.UDPBufSize {
-		return 0, nil, errors.New("packet invalid")
+	length := int(binary.BigEndian.Uint16(p[:2]))
+	if length > common.MaxPacketSize {
+		return 0, nil, target, errors.New("packet invalid")
 	}
 
 	// CRLF
-	if _, err = io.ReadFull(pc.Conn, b[:2]); err != nil {
-		return 0, nil, err
+	if _, err = io.ReadFull(pc.Conn, p[:2]); err != nil {
+		return 0, nil, target, err
 	}
 
 	// Payload
-	n, err := io.ReadFull(pc.Conn, b[:length])
+	n, err := io.ReadFull(pc.Conn, p[:length])
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, target, err
 	}
 
-	return n, nil, err
+	return n, nil, target, err
 }
 
-// WriteTo overrides the original function from net.PacketConn.
-func (pc *PacketConn) WriteTo(b []byte, addr net.Addr) (int, error) {
+func (pc *PacketConn) WriteWithTarget(p []byte, addr net.Addr, target *proxy.Target) (n int, err error) {
 	buf := common.GetWriteBuffer()
 	defer common.PutWriteBuffer(buf)
 
-	buf.Write(socks5.ParseAddr(pc.targetAddr.String()))
-	binary.Write(buf, binary.BigEndian, uint16(len(b)))
+	buf.Write(socks5.ParseAddr(target.Addr()))
+	binary.Write(buf, binary.BigEndian, uint16(len(p)))
 	buf.Write(crlf)
-	buf.Write(b)
+	buf.Write(p)
 
 	return pc.Write(buf.Bytes())
-}
-
-func (pc *PacketConn) GetTargetAddr() *proxy.TargetAddr {
-	return pc.targetAddr
 }

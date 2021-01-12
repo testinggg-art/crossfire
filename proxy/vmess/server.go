@@ -59,7 +59,7 @@ func (s *Server) Name() string { return Name }
 
 func (s *Server) Addr() string { return s.addr }
 
-func (s *Server) Handshake(underlay net.Conn) (proxy.StreamConn, *proxy.TargetAddr, error) {
+func (s *Server) Handshake(underlay net.Conn) (proxy.StreamConn, *proxy.Target, error) {
 	// Set handshake timeout 3 seconds
 	if err := underlay.SetReadDeadline(time.Now().Add(time.Second * 3)); err != nil {
 		return nil, nil, err
@@ -140,7 +140,7 @@ func (s *Server) Handshake(underlay net.Conn) (proxy.StreamConn, *proxy.TargetAd
 	}
 
 	// 解析地址, 从41位开始读
-	addr := &proxy.TargetAddr{}
+	addr := &proxy.Target{}
 	addr.Port = int(binary.BigEndian.Uint16(req[38:40]))
 	l := 0
 	switch req[40] {
@@ -183,7 +183,7 @@ func (s *Server) Handshake(underlay net.Conn) (proxy.StreamConn, *proxy.TargetAd
 	} else {
 		addr.Name = string(reqRemaining[:l])
 	}
-	c.target = addr.String()
+	c.target = addr.Addr()
 	full := fullReq.Bytes()
 	// log.Printf("Request Recv %v", full)
 
