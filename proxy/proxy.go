@@ -399,12 +399,13 @@ func (p *Proxy) udpLoop(lc *net.UDPConn) {
 			log.Printf("failed to parse dail udp addr: %v", err)
 			continue
 		}
+
 		var prc PacketConn
 		// Key for reusing connection
 		key := fmt.Sprintf("%v-%v", localAddr, dialAddr)
 		v, ok := nm.Load(key)
 		if !ok && v == nil {
-			prc, err := p.Pack(client, dialAddr, target)
+			prc, err = p.Pack(client, dialAddr, target)
 			if err != nil {
 				continue
 			}

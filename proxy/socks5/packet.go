@@ -40,6 +40,7 @@ func (pc *PacketConn) ReadWithTarget(p []byte) (int, net.Addr, *proxy.Target, er
 	if err != nil {
 		return n, remoteAddr, target, fmt.Errorf("failed to read target address: %v", err)
 	}
+	target.Network = "udp"
 
 	copy(p, buf[3+rn:])
 	return n - 3 - rn, remoteAddr, target, nil
