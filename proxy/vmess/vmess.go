@@ -78,7 +78,6 @@ func ParseAddr(s string) (byte, []byte, uint16, error) {
 	return atyp, addr, uint16(portnum), err
 }
 
-
 // TimestampHash returns the iv of AES-128-CFB encrypter
 // IV：MD5(X + X + X + X)，X = []byte(timestamp.now) (8 bytes, Big Endian)
 func TimestampHash(unixSec int64) []byte {

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
+
 	"io"
 	"net"
 	"strings"
@@ -12,7 +14,7 @@ import (
 	"github.com/jarvisgally/crossfire/common"
 	"github.com/jarvisgally/crossfire/proxy"
 	"golang.org/x/net/dns/dnsmessage"
-	golang_proxy "golang.org/x/net/proxy"
+	goProxy "golang.org/x/net/proxy"
 )
 
 func TestSocks(t *testing.T) {
@@ -59,7 +61,7 @@ func TestSocks(t *testing.T) {
 	}()
 
 	// TCP client
-	client, err := golang_proxy.SOCKS5("tcp", addr, nil, golang_proxy.Direct)
+	client, err := goProxy.SOCKS5("tcp", addr, nil, goProxy.Direct)
 	common.Must(err)
 	rc, err := client.Dial("tcp", theTarget.String())
 	common.Must(err)
@@ -224,6 +226,69 @@ func TestDnsRequest(t *testing.T) {
 		}
 	}
 	// log.Printf("Found A/AAAA records for name %s: %v\n", wantName, gotIPs)
+	if len(gotIPs) == 0 {
+		t.Fail()
+	}
+}
+
+// Send dns request to a running socks5 server
+func TriggerDnsRequestToRemoteServer(t *testing.T) {
+	// Target, a public resolver
+	theTarget, err := proxy.NewTarget("8.8.8.8:53", "udp")
+	common.Must(err)
+
+	// Create DNS message
+	wantName := "baidu.com."
+	msg := dnsmessage.Message{
+		Questions: []dnsmessage.Question{
+			{
+				Name:  dnsmessage.MustNewName(wantName),
+				Type:  dnsmessage.TypeA,
+				Class: dnsmessage.ClassINET,
+			},
+		},
+	}
+	buf, err := msg.Pack()
+	common.Must(err)
+
+	// Connect to a running socks5 server
+	udpAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:1081")
+	common.Must(err)
+
+	// Udp Client
+	zeroAddr := &net.UDPAddr{IP: net.IPv4zero, Port: 0}
+	udpClient, err := net.ListenUDP("udp", zeroAddr)
+	common.Must(err)
+	prc := &PacketConn{udpClient}
+	defer prc.Close()
+	prc.WriteWithTarget(buf, udpAddr, theTarget)
+	recvBuf := common.GetBuffer(common.MaxPacketSize)
+	defer common.PutBuffer(recvBuf)
+	n, _, _, err := prc.ReadWithTarget(recvBuf)
+	common.Must(err)
+	var response dnsmessage.Message
+	err = response.Unpack(recvBuf[:n])
+	common.Must(err)
+	log.Printf("got response %v", response)
+	var gotIPs []net.IP
+	for _, n := range response.Answers {
+		h := n.Header
+		if (h.Type != dnsmessage.TypeA && h.Type != dnsmessage.TypeAAAA) || h.Class != dnsmessage.ClassINET {
+			continue
+		}
+		if !strings.EqualFold(h.Name.String(), wantName) {
+			continue
+		}
+		switch h.Type {
+		case dnsmessage.TypeA: // IPv4
+			r, _ := n.Body.(*dnsmessage.AResource)
+			gotIPs = append(gotIPs, r.A[:])
+		case dnsmessage.TypeAAAA: // IPv6
+			r, _ := n.Body.(*dnsmessage.AAAAResource)
+			gotIPs = append(gotIPs, r.AAAA[:])
+		}
+	}
+	log.Printf("Found A/AAAA records for name %s: %v\n", wantName, gotIPs)
 	if len(gotIPs) == 0 {
 		t.Fail()
 	}

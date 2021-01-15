@@ -3,12 +3,12 @@ package api
 import (
 	"context"
 	"fmt"
-	user2 "github.com/jarvisgally/crossfire/user"
-	"google.golang.org/grpc"
 	"testing"
 	"time"
 
 	"github.com/jarvisgally/crossfire/common"
+	user2 "github.com/jarvisgally/crossfire/user"
+	"google.golang.org/grpc"
 )
 
 func TestServerAPI(t *testing.T) {

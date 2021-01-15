@@ -38,13 +38,17 @@ type PacketConn struct {
 }
 
 func (pc *PacketConn) ReadWithTarget(p []byte) (int, net.Addr, *proxy.Target, error) {
-	n, remoteAddr, err := pc.UDPConn.ReadFrom(p)
+	n, _, err := pc.UDPConn.ReadFrom(p)
 	if err != nil {
-		return n, remoteAddr, nil, err
+		return n, nil, nil, err
 	}
-	return n, remoteAddr, nil, nil
+	return n, nil, nil, nil
 }
 
 func (pc *PacketConn) WriteWithTarget(p []byte, addr net.Addr, target *proxy.Target) (n int, err error) {
-	return pc.UDPConn.WriteTo(p, addr)
+	targetAddr, err := net.ResolveUDPAddr("udp", target.Addr())
+	if err != nil {
+		return 0, err
+	}
+	return pc.UDPConn.WriteTo(p, targetAddr)
 }

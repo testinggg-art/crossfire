@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/jarvisgally/crossfire/common"
 	"io"
 	"log"
 	"net"
 	"testing"
 
+	"github.com/jarvisgally/crossfire/common"
 	"github.com/jarvisgally/crossfire/proxy"
 )
 

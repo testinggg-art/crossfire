@@ -261,7 +261,7 @@ func (p *Proxy) tcpLoop(listener net.Listener) {
 				relayPacket := func(left, right PacketConn) {
 					for {
 						buf := make([]byte, common.MaxPacketSize)
-						n, _, target, err := right.ReadWithTarget(buf)
+						n, _, _, err := right.ReadWithTarget(buf)
 						if err != nil {
 							errChan <- err
 							return

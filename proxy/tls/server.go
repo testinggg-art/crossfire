@@ -78,7 +78,7 @@ func (s *Server) Handshake(underlay net.Conn) (proxy.StreamConn, *proxy.Target, 
 	sniffConn := common.NewSniffConn(tlsConn)
 	t := sniffConn.Sniff()
 	if t == common.TypeUnknown {
-		// this is not a http request, route to inner protocol, e.g, vmess/trojan
+		// this is not a http request, route to inner protocol, e.g, trojan
 		return s.inner.Handshake(sniffConn)
 	} else {
 		// http request, route to fallback address

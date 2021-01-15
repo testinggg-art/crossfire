@@ -9,6 +9,9 @@ import (
 
 // Function that search the specified file in related paths.
 func GetPath(fileName string) string {
+	if fileName == "" {
+		return ""
+	}
 	paths := make([]string, 0)
 	// Same folder with exec file
 	if execFile, err := os.Executable(); err == nil {

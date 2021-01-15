@@ -28,7 +28,6 @@ func HumanFriendlyTraffic(bytes uint64) string {
 	return fmt.Sprintf("%.2f GiB", float32(bytes)/GiB)
 }
 
-// For testing only
 func PickPort(network string, host string) int {
 	switch network {
 	case "tcp":
