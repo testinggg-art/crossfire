@@ -325,6 +325,8 @@ func (p *Proxy) Handshake(client Client, dialAddr string, target *Target) (Strea
 		log.Printf("failed to dail to %v: %v", dialAddr, err)
 		return nil, err
 	}
+	// Read timeout
+	rc.SetReadDeadline(time.Now().Add(time.Second * 10))
 	// Handshake with raw net.Conn of remote server and return a connection with protocol support
 	wrc, err := client.Handshake(rc, target)
 	if err != nil {
@@ -403,6 +405,7 @@ func (p *Proxy) udpLoop(lc *net.UDPConn) {
 		var prc PacketConn
 		// Key for reusing connection
 		key := fmt.Sprintf("%v-%v", localAddr, dialAddr)
+		// TODO: Use channel to limit active connections
 		v, ok := nm.Load(key)
 		if !ok && v == nil {
 			prc, err = p.Pack(client, dialAddr, target)

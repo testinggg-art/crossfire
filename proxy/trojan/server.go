@@ -8,7 +8,6 @@ import (
 	"log"
 	"net"
 	"net/url"
-	"time"
 
 	"github.com/jarvisgally/crossfire/api"
 	"github.com/jarvisgally/crossfire/common"
@@ -48,14 +47,7 @@ func (s *Server) Name() string { return Name }
 func (s *Server) Addr() string { return s.addr }
 
 func (s *Server) Handshake(underlay net.Conn) (proxy.StreamConn, *proxy.Target, error) {
-	// Set handshake timeout 3 seconds
-	if err := underlay.SetReadDeadline(time.Now().Add(time.Second * 3)); err != nil {
-		return nil, nil, err
-	}
-	defer underlay.SetReadDeadline(time.Time{})
-
 	c := &ServerConn{Conn: underlay}
-
 	rn := 0
 
 	// Auth

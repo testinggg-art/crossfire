@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/url"
-	"time"
 
 	"github.com/jarvisgally/crossfire/common"
 	"github.com/jarvisgally/crossfire/proxy"
@@ -44,13 +43,6 @@ func (s *Server) Name() string { return Name }
 func (s *Server) Addr() string { return s.addr }
 
 func (s *Server) Handshake(underlay net.Conn) (proxy.StreamConn, *proxy.Target, error) {
-	// TODO: MOVE to proxy
-	// Set handshake timeout 3 seconds
-	if err := underlay.SetReadDeadline(time.Now().Add(time.Second * 3)); err != nil {
-		return nil, nil, err
-	}
-	defer underlay.SetReadDeadline(time.Time{})
-
 	reqOneByte := common.GetBuffer(1)
 	defer common.PutBuffer(reqOneByte)
 
