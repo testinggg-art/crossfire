@@ -351,7 +351,7 @@ func (p *Proxy) Pack(client Client, dialAddr string, target *Target) (PacketConn
 	} else { // UDP over TCP
 		rc0, err := net.Dial("tcp", dialAddr)
 		if err != nil {
-			log.Printf("failed to dail tcp to %v: %v", dialAddr, err)
+			log.Printf("failed to dail udp over tcp to %v: %v", dialAddr, err)
 			return nil, err
 		}
 		rc, err = client.Handshake(rc0, target)
@@ -408,6 +408,7 @@ func (p *Proxy) udpLoop(lc *net.UDPConn) {
 		// TODO: Use channel to limit active connections
 		v, ok := nm.Load(key)
 		if !ok && v == nil {
+			// log.Printf("New connection %v", key)
 			prc, err = p.Pack(client, dialAddr, target)
 			if err != nil {
 				continue
@@ -417,20 +418,23 @@ func (p *Proxy) udpLoop(lc *net.UDPConn) {
 			go func() {
 				b := common.GetBuffer(common.MaxPacketSize)
 				defer common.PutBuffer(b)
+				defer prc.Close()
+				defer nm.Delete(key)
 				for {
 					n, _, _, err := prc.ReadWithTarget(b) // 3. Read from remote server
 					if err != nil {
+						log.Printf("failed in read udp from remote: %v", err)
 						return
 					}
 					_, err = plc.WriteWithTarget(b[:n], localAddr, target) // 4. Write to local client
 					if err != nil {
+						log.Printf("failed in write udp to local: %v", err)
 						return
 					}
 				}
-				prc.Close()
-				nm.Delete(key)
 			}()
 		} else {
+			// log.Printf("Reuse connection %v", key)
 			prc = v.(PacketConn)
 		}
 		_, err = prc.WriteWithTarget(packetBuf[:n], dailUdpAddr, target) // 2.Write to remote server
